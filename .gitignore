@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+.conda/
+*.zip
+*.sqlite3
+chroma_db/
+.codegraph/
+#.env
+*api key*
+*.xlsx
+*.csv
