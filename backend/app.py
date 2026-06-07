@@ -1131,10 +1131,14 @@ def _external_fallback_result(api: str, message: str = FRIENDLY_BACKUP_MESSAGE, 
     return {"success": False, "friendly": True, "message": message, "error": message}
 
 def _weather_cache_key(loc: dict) -> str:
+    date_key = time.strftime("%Y-%m-%d")
+    name = _city_alias(str(loc.get("name") or "").replace("市", "").replace("省", "").strip())
+    if name and name not in ("当前位置", "当前定位", "我这里", "本地"):
+        return f"city:{name.lower()}:{date_key}"
     try:
-        return f"coord:{round(float(loc.get('lat')), 3)}:{round(float(loc.get('lng')), 3)}"
+        return f"coord:{round(float(loc.get('lat')), 3)}:{round(float(loc.get('lng')), 3)}:{date_key}"
     except Exception:
-        return "city:" + _city_alias(str(loc.get("name") or "当前位置")).lower()
+        return f"city:unknown:{date_key}"
 
 def _weather_cached(key: str, max_age: int) -> Optional[dict]:
     now = time.time()
@@ -7893,15 +7897,33 @@ def _weather_from_loc(loc: dict) -> dict:
         return _weather_fallback_result(loc, e)
 
 
+def _nearest_weather_city_name(lat: float, lng: float, max_km: float = 80.0) -> str:
+    best_name, best_dist = "", 10**9
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+        for _, info in CITY_GEO_INDEX.items():
+            dist = _haversine(lat_f, lng_f, float(info["lat"]), float(info["lng"]))
+            if dist < best_dist:
+                best_name, best_dist = str(info.get("name") or ""), dist
+    except Exception:
+        return ""
+    return best_name if best_name and best_dist <= max_km else ""
+
+
 def tool_get_weather_by_coords(lat: float, lng: float, name: str = "当前位置") -> dict:
     try:
-        loc = {"lat": float(lat), "lng": float(lng), "name": name or "当前位置", "country": ""}
+        display_name = name or "当前位置"
+        if display_name in ("当前位置", "当前定位", "我这里", "本地"):
+            display_name = _nearest_weather_city_name(float(lat), float(lng)) or display_name
+        loc = {"lat": float(lat), "lng": float(lng), "name": display_name, "country": ""}
     except (TypeError, ValueError):
         return {"success": False, "error": "lat/lng 参数无效"}
     return _weather_from_loc(loc)
 
 
 def tool_get_weather(city: str) -> dict:
+    if not str(city or "").strip():
+        return {"success": False, "friendly": True, "error": "你想查询哪个城市的天气？也可以开启定位。", "message": "你想查询哪个城市的天气？也可以开启定位。"}
     ck=city.replace("市","").replace("省","").strip()
     known = CITY_GEO_INDEX.get(_city_alias(ck))
     loc = {"lat":known["lat"],"lng":known["lng"],"name":known["name"],"country":known["country"]} if known else None
@@ -11432,13 +11454,15 @@ def _looks_weather_only_query(text: str) -> bool:
 
 def _weather_city_from_message(text: str, city_hint: str) -> str:
     s = str(text or "")
-    city = extract_city_from_message(s) or _detect_message_destination(s) or city_hint or "上海"
+    city = extract_city_from_message(s) or _detect_message_destination(s) or city_hint or ""
+    if re.search(r"目的地待确认|待确认|当前位置|当前定位|本地", str(city or "")):
+        city = ""
     m1 = re.search(r"([^\s，,。！!？?]{2,12})(?:的|今天|明天|现在)?天气", s)
     if m1:
         raw = re.sub(r"[的是怎么样查询今天明天现在]", "", m1.group(1)).strip()
         if len(raw) >= 2 and not re.search(r"当前位置|当前定位|我这里|我在|附近|本地", raw):
             city = raw
-    return _city_alias(_clean_place_token(city)) or "上海"
+    return _city_alias(_clean_place_token(city)) or ""
 
 
 def _weather_final_text(result: dict) -> str:
@@ -11467,7 +11491,7 @@ def _rule_weather_agent_response(user_message: str, city_hint: str) -> Response:
             city = _weather_city_from_message(user_message, city_hint)
             args = {"city": city}
             yield f"data: {json.dumps({'type':'step_start','id':1,'tool':'get_weather','input':args}, ensure_ascii=False)}\n\n"
-            result = tool_get_weather(city)
+            result = tool_get_weather(city) if city else {"success": False, "friendly": True, "message": "你想查询哪个城市的天气？也可以开启定位。"}
         yield f"data: {json.dumps({'type':'step_done','id':1,'tool':'get_weather','result':result,'summary':_tool_summary('get_weather', args, result)}, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type':'final','text':_weather_final_text(result)}, ensure_ascii=False)}\n\n"
     return Response(stream_with_context(generate()), mimetype="text/event-stream",
@@ -11871,7 +11895,10 @@ def api_weather():
     if lat and lng:
         r = tool_get_weather_by_coords(lat, lng, request.args.get("city", "当前位置").strip() or "当前位置")
     else:
-        r = tool_get_weather(request.args.get("city","上海").strip())
+        city = request.args.get("city", "").strip()
+        if not city:
+            return jsonify({"status":"warning","message":"你想查询哪个城市的天气？也可以开启定位。"}), 200
+        r = tool_get_weather(city)
     if r.get("success"):
         return jsonify({
             "status": "success",

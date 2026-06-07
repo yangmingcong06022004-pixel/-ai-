@@ -760,15 +760,15 @@
     .wp-map{min-height:240px}
   }
   @media (max-width:760px){
-    html,body{overflow:hidden}
+    html,body{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
     .topbar{height:52px;padding:0 12px;gap:8px}
     .top-logo{width:32px;height:32px;font-size:28px}
     .top-name{font-size:18px;letter-spacing:1px;white-space:nowrap}
     .top-tag{display:none}
-    .workspace,.workspace.insight-collapsed{display:block;overflow:hidden}
+    .workspace,.workspace.insight-collapsed{display:block;overflow:visible}
     .sidebar,.insight-panel{display:none!important}
-    .chat-panel{height:calc(100vh - 52px);min-width:0}
-    .chat-home{overflow:auto}
+    .chat-panel{height:auto;min-height:0;min-width:0;overflow:visible}
+    .chat-home{height:auto;overflow:visible}
     .chat-home-main{padding:20px 14px 18px;max-width:none;gap:14px}
     .chat-hero-title{font-size:24px;letter-spacing:2px}
     .chat-hero-sub{font-size:12px}
@@ -855,19 +855,19 @@
   .price-sim-window-tag{font-size:9px;color:var(--t3);font-family:var(--mono)}
   .price-sim-tip{font-size:11px;color:var(--t2);line-height:1.6;padding:8px 10px;background:rgba(255,107,0,.04);border-radius:9px;border:1px solid rgba(255,107,0,.1)}
   @media (max-width:768px){
-    html,body{height:100%;overflow-x:hidden;overflow-y:hidden}
-    body{min-height:100%;overscroll-behavior-y:contain}
+    html,body{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
+    body{overscroll-behavior-y:contain}
     .topbar{height:56px;padding:0 14px;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
     .top-logo{width:32px;height:32px;font-size:28px;filter:none}
     .top-name{font-size:18px}
     .top-tag,.top-status,.sidebar,.insight-panel,.chat-home-sidebar,.left-panel,.right-panel{display:none!important}
-    .workspace,.workspace.insight-collapsed{display:block;grid-template-columns:1fr;flex:1;min-height:0;overflow:hidden}
+    .workspace,.workspace.insight-collapsed{display:block;grid-template-columns:1fr;flex:1;min-height:0;overflow:visible}
     .workspace:before{display:none}
-    .panel,.chat-panel{width:100%;height:calc(100vh - 56px);min-height:0;overflow:hidden}
-    .chat-home{display:block;height:100%;min-height:0;overflow:hidden}
-    .chat-home-main,.chat-conv-area,.result-panel{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-left:16px;padding-right:16px;padding-bottom:104px}
+    .panel,.chat-panel{width:100%;height:auto;min-height:0;overflow:visible}
+    .chat-home{display:block;height:auto;min-height:0;overflow:visible}
+    .chat-home-main,.chat-conv-area,.result-panel{height:auto;overflow:visible;padding-left:16px;padding-right:16px;padding-bottom:96px}
     .chat-home-main{max-width:none;margin:0;padding-top:24px;gap:16px}
-    .chat-home.task-started .chat-home-main{padding:10px 14px 104px}
+    .chat-home.task-started .chat-home-main{padding:10px 14px 10px}
     .chat-hero-title{font-size:24px;line-height:1.25;letter-spacing:1px}
     .chat-hero-sub{font-size:12px;line-height:1.7}
     .planner-control-row{grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:none}
@@ -885,7 +885,7 @@
     .feat-card:before{display:none}
     .chat-input-bar{position:sticky;bottom:0;z-index:20;padding:10px 12px max(10px,env(safe-area-inset-bottom));background:#fbf7ef;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
     .chat-textarea{max-height:88px}
-    .chat-conv-area{padding-top:14px}
+    .chat-conv-area{height:auto;overflow:visible;padding-top:14px;padding-bottom:96px}
     .msg,.msg-body,.msg.wide-agent .msg-body{max-width:100%}
     .agent-card,.chat-route,.meituan-trip-card,.weekend-plan-card,.panorama-trip-card,.mt-card,.mt-mini,.planner-stat,.route-choice-card,.weather-card,.ai-card,.steps-card,.m-card,.route-bar,.intent-lock-card,.pending-order-card,.feat-card{box-shadow:none!important}
     .chat-searchbar,.chat-textarea,.field input,.field select,.michelin-input{box-shadow:none!important}
@@ -1211,7 +1211,10 @@ let mapRuntimeConfig = null;
 let voiceAutoSend = true;
 let lastHomeTaskInput = '';
 const MOBILE_VIEWPORT = window.matchMedia('(max-width: 768px)');
-function scrollOpts(block='end'){return {behavior:MOBILE_VIEWPORT.matches?'auto':'smooth',block};}
+function scrollOpts(block='end'){
+  const safeBlock = MOBILE_VIEWPORT.matches && block === 'end' ? 'nearest' : block;
+  return {behavior:MOBILE_VIEWPORT.matches?'auto':'smooth',block:safeBlock};
+}
 
 function setText(id, text) {
   const el = document.getElementById(id);
@@ -2698,9 +2701,74 @@ async function fetchWeatherForIntent(intent, fallbackCity){
     const data = await fetchWeatherByLocation(gps.lat, gps.lng, '当前位置');
     return {label:data.city || '当前位置', data};
   }
-  const label = intent?.city || fallbackCity || '上海';
+  const label = (intent?.city || fallbackCity || getCurrentWeatherTaskCity() || '').trim();
+  if (!label || /目的地待确认|待确认|当前位置/.test(label)) {
+    const gps = await getGPS(6000);
+    if (gps) {
+      const data = await fetchWeatherByLocation(gps.lat, gps.lng, '当前位置');
+      return {label:data.city || '当前位置', data};
+    }
+    throw new Error('你想查询哪个城市的天气？也可以开启定位。');
+  }
   const data = await fetchWeather(label);
   return {label:data.city || label, data};
+}
+function getExplicitWeatherCity(text=''){
+  const s = String(text || '');
+  const m = s.match(/(?:查|查询|看看|看一下)?\s*([^，,。！!？?\s]{2,12})(?:的|今天|明天|现在)?天气/);
+  if (m) {
+    const raw = m[1].replace(/[的是怎么样查询今天明天现在]/g, '').trim();
+    if (raw && !/当前位置|当前定位|我这里|我在|附近|本地|天气/.test(raw)) return raw.replace(/[市省]$/,'');
+  }
+  try {
+    const guessed = _guessDestCity(s, '');
+    return guessed && guessed !== '本地' ? guessed.replace(/[市省]$/,'') : '';
+  } catch { return ''; }
+}
+function getCurrentWeatherTaskCity(){
+  const taskState = window.currentTaskState || {};
+  const plan = window.lastInsightPlan || {};
+  const candidates = [
+    taskState.destination, taskState.active_destination, taskState.city, taskState.active_city,
+    resolvePlanCity(plan), window.lastAgentCity, guessHomeDestination(lastHomeTaskInput || '')
+  ];
+  for (const c of candidates) {
+    const city = String(c || '').replace(/[市省]$/,'').trim();
+    if (city && !/目的地待确认|待确认|本地|当前位置/.test(city)) return city;
+  }
+  return '';
+}
+async function resolveWeatherFeatureTarget(){
+  const activeInput = isHomeTaskStarted() ? document.getElementById('chatInput') : document.getElementById('chatHomeInput');
+  const text = [
+    activeInput?.value || '',
+    lastHomeTaskInput || '',
+    window.lastAgentInput || ''
+  ].join(' ');
+  const explicitCity = getExplicitWeatherCity(text);
+  if (explicitCity) return {type:'city', city:explicitCity, source:'用户输入'};
+  const taskCity = getCurrentWeatherTaskCity();
+  if (taskCity) return {type:'city', city:taskCity, source:'当前任务'};
+  const gps = await getGPS(6000);
+  if (gps) return {type:'coords', lat:gps.lat, lng:gps.lng, label:'当前位置', source:'当前位置'};
+  return {type:'missing'};
+}
+async function fetchWeatherForFeature(){
+  const target = await resolveWeatherFeatureTarget();
+  if (target.type === 'missing') {
+    return {missing:true, label:'当前位置'};
+  }
+  if (target.type === 'coords') {
+    const data = await fetchWeatherByLocation(target.lat, target.lng, target.label);
+    return {label:data.city || target.label, data, target};
+  }
+  const data = await fetchWeather(target.city);
+  return {label:data.city || target.city, data, target};
+}
+function renderWeatherFeatureResult(label, data){
+  const base = renderWeatherCard(label, data.data);
+  const note = data.cached ? `<div class="feature-empty-card" style="margin-top:8px">天气参考：来自最近一次查询，出发前建议再次确认。</div>` : '';
+  return base + note;
 }
 async function fetchRouteMulti(city,start,dest,profile=currentRouteProfile){
   const payload = buildRoutePayload({city, startAddr:start, destAddr:dest, profile});
@@ -3146,12 +3214,17 @@ function buildRouteIntensityHTML(){
 async function handleFeatureAction(featureType){
   console.log('[FEATURE_ACTION]', featureType);
   if (featureType === 'weather') {
-    setFeatureLoading(featureType, '正在查询当前位置天气...');
+    setFeatureLoading(featureType, '正在确认天气位置...');
     try {
-      const data = await fetchWeatherForIntent({intent:'weather',city:'当前位置',use_location:true}, document.getElementById('city')?.value?.trim() || '');
-      renderFeatureResult(featureType, renderWeatherCard(data.label, data.data.data));
+      const data = await fetchWeatherForFeature();
+      if (data.missing) {
+        renderFeatureResult(featureType, featureSmallCard('你想查询哪个城市的天气？也可以开启定位。'));
+      } else {
+        renderFeatureResult(featureType, renderWeatherFeatureResult(data.label, data.data));
+      }
     } catch (e) {
-      renderFeatureResult(featureType, featureSmallCard('天气数据暂未返回，出发前建议再次确认。'));
+      const city = getCurrentWeatherTaskCity();
+      renderFeatureResult(featureType, featureSmallCard(city ? `${city} 天气数据暂未返回，出发前建议再次确认。` : '天气数据暂未返回，当前先按常规出行条件生成路线；出发前建议再次确认天气。'));
     } finally { setStatus('', '就绪'); setMascot('idle'); }
     return;
   }
@@ -3756,7 +3829,7 @@ function createAgentCard(opts){
   const home=document.getElementById('chatHome');
   if(home&&home.style.display!=='none')showChatConv();
   document.getElementById('chatMessages').appendChild(div);
-  div.scrollIntoView(scrollOpts('end'));
+  div.scrollIntoView(scrollOpts(MOBILE_VIEWPORT.matches ? 'start' : 'end'));
   if (!toilet) _startAgentTimer(id); // 🚻 找厕所不显示"生成路线"计时文案
   return id;
 }
@@ -3827,7 +3900,7 @@ function addAgentStep(cardId,sid,toolName,toolInput){
   if (document.getElementById(`tdot_intent_${cardId}`)?.className.includes('running')) {
     taskTreeFinishIntent(cardId, `识别到 ${meta.label} 需求`);
   }
-  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts('end'));
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts(MOBILE_VIEWPORT.matches ? 'start' : 'end'));
 }
 function addCompletedAgentStep(cardId, toolName, summary, chip='地图') {
   if (window._toiletCards && window._toiletCards[cardId]) return;
@@ -6213,7 +6286,7 @@ function appendMeituanRealCard(cardId, evt){
        <div style="font-weight:700;color:#0b8f3a;font-size:13px">🍽️ 已补充美团真实资源</div>
        <div style="font-size:12px;color:var(--t2);margin-top:4px">${escapeHTML(evt.message||'以下商户来自美团真实资源，营业和订位需二次确认。')}</div>${cards}
      </div>`);
-  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts('end'));
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts(MOBILE_VIEWPORT.matches ? 'start' : 'end'));
 }
 
 function decodeMeituanItem(encodedPayload){
