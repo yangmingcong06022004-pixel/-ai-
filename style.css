@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>马到橙🍊功 Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;600&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --o1:#FF6B00;--o2:#E85C00;--o3:#FF9A00;
+      --r1:#D4001Fs--r2:#E8163A;
+      --bg0:#FFFDF8;--bg1:#FFFFFF;--bg2:#FFF5E6;--bg3:#FFE8CC;--bg4:#FFD199;
+      --line:rgba(200,100,0,0.14);--line2:rgba(200,100,0,0.24);
+      --t1:#1C0800;--t2:#7A4520;--t3:#B07840;
+      --gold:#CC8800;--cream:#FFF8EE;
+      --sans:'Noto Serif SC',serif;--mono:'JetBrains Mono',monospace;--brush:'Ma Shan Zheng',cursive;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden}
+    body{font-family:var(--sans);background:var(--bg0);color:var(--t1);display:flex;flex-direction:column}
+    .topbar{height:58px;background:var(--bg1);border-bottom:2px solid rgba(255,150,0,0.22);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;position:relative;z-index:10;background-image:linear-gradient(90deg,rgba(255,150,0,0.07) 0%,transparent 60%);box-shadow:0 2px 12px rgba(200,80,0,0.07)}
+    .top-logo{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,var(--o1),var(--r1));display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 18px rgba(255,107,0,0.35)}
+    .top-name{font-family:var(--brush);font-size:20px;color:var(--o1);letter-spacing:2px;text-shadow:0 1px 6px rgba(255,107,0,0.2)}
+    .top-tag{font-size:11px;color:var(--t3);padding:3px 10px;border-radius:20px;border:1px solid var(--line);background:var(--bg2);font-family:var(--mono)}
+    .mode-switcher{margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+    .mode-btn{padding:6px 14px;border-radius:8px;border:none;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;color:var(--t3);background:transparent;display:flex;align-items:center;gap:6px}
+    .mode-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--t3);transition:all 0.2s}
+    .mode-btn.active{background:var(--bg4);color:var(--t1)}
+    .mode-btn.active .dot{background:var(--o1);box-shadow:0 0 6px var(--o1)}
+    .top-status{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;background:rgba(255,107,0,0.08);color:var(--o2);border:1px solid rgba(255,107,0,0.22);transition:all 0.3s;font-family:var(--mono);margin-left:10px}
+    .top-status.busy{background:rgba(255,149,0,0.09);color:var(--o2);border-color:rgba(255,149,0,0.28)}
+    .top-status.err{background:rgba(212,0,31,0.07);color:var(--r2);border-color:rgba(212,0,31,0.22)}
+    .workspace{flex:1;display:grid;grid-template-columns:290px 1fr;overflow:hidden}
+    .sidebar{background:var(--bg1);border-right:1px solid var(--line2);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:2px 0 8px rgba(200,100,0,0.05)}
+    .sidebar::-webkit-scrollbar{width:3px}
+    .sidebar::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+    .sec-head{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:6px;margin-bottom:6px;font-family:var(--mono)}
+    .sec-head::before{content:'';width:3px;height:10px;border-radius:2px;background:linear-gradient(var(--o1),var(--r1))}
+    .field{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+    .field label{font-size:11px;color:var(--t2);font-weight:500}
+    .field input,.field select{background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--t1);font-family:var(--sans);font-size:13px;padding:8px 12px;height:36px;outline:none;transition:border-color 0.15s,box-shadow 0.15s;appearance:none;-webkit-appearance:none}
+    .field input::placeholder{color:var(--t3)}
+    .field input:focus,.field select:focus{border-color:rgba(232,92,0,0.5);box-shadow:0 0 0 3px rgba(232,92,0,0.08);background:var(--bg3)}
+    .field select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23B07840'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:28px}
+    .field select option{background:var(--bg2);color:var(--t1)}
+    .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .seg-btn{padding:8px 6px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);color:var(--t2);font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.15s}
+    .seg-btn:hover{border-color:var(--line2);color:var(--t1);background:var(--bg3)}
+    .seg-btn.on-orange{background:rgba(255,107,0,0.1);border-color:rgba(255,107,0,0.4);color:var(--o1)}
+    .seg-btn.on-red{background:rgba(212,0,31,0.08);border-color:rgba(212,0,31,0.35);color:var(--r1)}
+    .divider{height:1px;background:var(--line);flex-shrink:0}
+    .run-btn{width:100%;height:44px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--o1),var(--r1));color:#fff;font-family:var(--brush);font-size:16px;letter-spacing:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.15s,transform 0.1s,box-shadow 0.2s;box-shadow:0 4px 18px rgba(255,107,0,0.28)}
+    .run-btn:hover{opacity:0.9;box-shadow:0 6px 26px rgba(255,107,0,0.42)}
+    .run-btn:active{transform:scale(0.98)}
+    .run-btn:disabled{opacity:0.3;cursor:not-allowed;box-shadow:none}
+    .hint-text{font-size:11px;color:var(--t3);text-align:center;line-height:1.7;font-family:var(--mono)}
+    .hint-text code{color:var(--o2)}
+    .mascot-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px;gap:4px}
+    .mascot-svg{width:80px;height:80px;cursor:pointer}
+    .mascot-state{font-size:10px;color:var(--t3);font-family:var(--mono);text-align:center}
+    @keyframes idle-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes cycle-body{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+    @keyframes fly-shake{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8px) rotate(3deg)}}
+    @keyframes weather-sway{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+    @keyframes think-pulse{0%,100%{opacity:0.4;transform:scale(0.9)}50%{opacity:1;transform:scale(1)}}
+    @keyframes cheer-jump{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-10px) scale(1.1)}60%{transform:translateY(-8px) scale(1.05)}}
+    @keyframes spin-wheel{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+    @keyframes float-cloud{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+    @keyframes fadeSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .mascot-svg.state-idle{animation:idle-bob 2s ease-in-out infinite}
+    .mascot-svg.state-cycling{animation:cycle-body 0.5s ease-in-out infinite}
+    .mascot-svg.state-flying{animation:fly-shake 1s ease-in-out infinite}
+    .mascot-svg.state-weather{animation:weather-sway 1.5s ease-in-out infinite}
+    .mascot-svg.state-thinking{animation:think-pulse 1s ease-in-out infinite}
+    .mascot-svg.state-success{animation:cheer-jump 0.6s ease-in-out 3}
+    .mascot-svg.state-error{animation:idle-bob 3s ease-in-out infinite}
+    .panel{flex:1;overflow:hidden;display:flex;flex-direction:column}
+    .panel.hidden{display:none}
+    .result-panel{overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:var(--bg0)}
+    .result-panel::-webkit-scrollbar{width:3px}
+    .result-panel::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+    .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--t3);padding:60px 20px}
+    .empty-emoji{font-size:48px}
+    .empty-state p{font-size:13px;line-height:1.8;text-align:center;max-width:260px;color:var(--t2)}
+    .empty-state .slogan{font-family:var(--brush);font-size:22px;color:var(--o1);text-shadow:0 2px 8px rgba(255,107,0,0.2)}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .m-card{background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(200,100,0,0.06)}
+    .m-icon{font-size:16px;margin-bottom:6px}
+    .m-val{font-size:26px;font-weight:700;font-family:var(--mono);letter-spacing:-1.5px;color:var(--t1)}
+    .m-val .unit{font-size:12px;color:var(--t2);font-family:var(--sans);font-weight:400;margin-left:2px}
+    .m-lbl{font-size:11px;color:var(--t2);margin-top:3px}
+    .m-card.orange .m-val{color:var(--o1)}
+    .m-card.red .m-val{color:var(--r1)}
+    .route-bar{background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:11px 15px;display:flex;align-items:center;gap:10px;font-size:13px;box-shadow:0 2px 8px rgba(200,100,0,0.05)}
+    .rb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .rb-dot.orange{background:var(--o1);box-shadow:0 0 6px rgba(255,107,0,0.5)}
+    .rb-dot.red{background:var(--r1);box-shadow:0 0 6px rgba(212,0,31,0.4)}
+    .rb-line{flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--t3) 0,var(--t3) 4px,transparent 4px,transparent 8px)}
+    .rb-name{font-weight:600;font-size:13px;color:var(--t1)}
+    .map-link{margin-left:auto;font-size:12px;color:var(--o2);text-decoration:none;white-space:nowrap;font-weight:600}
+    .map-link:hover{text-decoration:underline}
+    .steps-card{background:var(--bg1);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(200,100,0,0.06)}
+    .card-top{padding:10px 15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--bg2)}
+    .card-top h3{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:0.6px;font-family:var(--mono)}
+    .badge{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:600;font-family:var(--mono)}
+    .badge.o{background:rgba(255,107,0,0.1);color:var(--o2);border:1px solid rgba(255,107,0,0.25)}
+    .badge.r{background:rgba(212,0,31,0.09);color:var(--r1);border:1px solid rgba(212,0,31,0.22)}
+    .step-list{list-style:none}
+    .step-row{display:flex;gap:12px;padding:9px 15px;border-bottom:1px solid var(--line);align-items:flex-start;transition:background 0.1s}
+    .step-row:last-child{border-bottom:none}
+    .step-row:hover{background:rgba(200,100,0,0.04)}
+    .s-num{width:20px;height:20px;border-radius:50%;flex-shrink:0;margin-top:1px;background:var(--bg3);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--t2);font-family:var(--mono)}
+    .s-body{flex:1}
+    .s-name{font-size:13px;font-weight:500;margin-bottom:3px;color:var(--t1)}
+    .s-meta{font-size:11px;color:var(--t2);display:flex;gap:10px;margin-bottom:4px;font-family:var(--mono)}
+    .s-turn{display:inline-block;font-size:10px;padding:2px 8px;border-radius:12px;font-weight:500;background:rgba(212,0,31,0.07);color:var(--r1);border:1px solid rgba(212,0,31,0.16)}
+    .ai-card{background:var(--bg1);border:1.5px solid rgba(255,107,0,0.28);border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(200,80,0,0.08)}
+    .ai-top{padding:10px 15px;border-bottom:1px solid rgba(255,107,0,0.14);display:flex;align-items:center;gap:8px;background:rgba(255,107,0,0.04)}
+    .ai-label{font-size:11px;font-weight:700;color:var(--o1);text-transform:uppercase;letter-spacing:0.6px;font-family:var(--mono)}
+    .ai-model{font-size:10px;color:var(--t3);margin-left:auto;font-family:var(--mono)}
+    .ai-body{padding:14px 15px;font-size:13px;line-height:1.9;color:var(--t1);white-space:pre-wrap;min-height:60px}
+    .cursor-blink{display:inline-block;width:7px;height:13px;background:var(--o1);border-radius:2px;vertical-align:text-bottom;animation:blink 0.8s step-end infinite}
+    .weather-card{background:linear-gradient(135deg,rgba(255,150,0,0.07),rgba(212,0,31,0.04));border:1px solid rgba(255,149,0,0.28);border-radius:12px;padding:16px;box-shadow:0 2px 12px rgba(200,80,0,0.07)}
+    .weather-main{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+    .weather-icon{font-size:40px}
+    .weather-temp{font-size:42px;font-weight:700;font-family:var(--mono);color:var(--o1);letter-spacing:-2px}
+    .weather-temp sup{font-size:16px;color:var(--t2)}
+    .weather-info{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--t2)}
+    .weather-info span{display:flex;gap:4px;align-items:center}
+    .weather-tip{margin-top:10px;padding:8px 12px;background:rgba(255,107,0,0.07);border-radius:8px;font-size:12px;color:var(--o2);border-left:3px solid var(--o1)}
+    .err-card{background:rgba(212,0,31,0.05);border:1px solid rgba(212,0,31,0.18);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--r1);line-height:1.7}
+    .chat-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg0)}
+    .chat-home{flex:1;display:grid;grid-template-columns:1fr 228px;overflow:hidden}
+    .chat-home-main{overflow-y:auto;padding:26px 24px 20px;display:flex;flex-direction:column;gap:18px;background:var(--bg0)}
+    .chat-home-main::-webkit-scrollbar{width:3px}
+    .chat-home-main::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+    .chat-hero{display:flex;flex-direction:column;gap:4px}
+    .chat-hero-title{font-family:var(--brush);font-size:24px;color:var(--o1);text-shadow:0 2px 8px rgba(255,107,0,0.18);letter-spacing:3px}
+    .chat-hero-sub{font-size:12px;color:var(--t3);font-family:var(--mono)}
+    .chat-searchbar-wrap{position:relative}
+    .chat-searchbar{width:100%;height:50px;background:var(--bg1);border:1.5px solid var(--line2);border-radius:14px;color:var(--t1);font-family:var(--sans);font-size:14px;padding:0 54px 0 18px;outline:none;transition:border-color 0.2s,box-shadow 0.2s;box-shadow:0 2px 12px rgba(200,80,0,0.07)}
+    .chat-searchbar::placeholder{color:var(--t3)}
+    .chat-searchbar:focus{border-color:rgba(232,92,0,0.55);box-shadow:0 0 0 4px rgba(232,92,0,0.07),0 4px 16px rgba(200,80,0,0.1);background:var(--bg1)}
+    .chat-searchbar-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--o1),var(--r1));color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(255,107,0,0.3);transition:opacity 0.15s,transform 0.1s}
+    .chat-searchbar-btn:hover{opacity:0.88}
+    .chat-searchbar-btn:active{transform:translateY(-50%) scale(0.93)}
+    .chat-toolbar{display:flex;gap:7px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+    .chat-toolbar::-webkit-scrollbar{height:0}
+    .toolbar-chip{flex-shrink:0;display:flex;align-items:center;gap:5px;padding:6px 13px;border-radius:20px;border:1px solid var(--line2);background:var(--bg2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+    .toolbar-chip:hover{border-color:rgba(232,92,0,0.4);color:var(--o2);background:rgba(255,150,0,0.08)}
+    .toolbar-chip.hot{border-color:rgba(255,107,0,0.35);color:var(--o1);background:rgba(255,107,0,0.07)}
+    .chip-icon{font-size:13px}
+    .feat-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .feat-section-title{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono);display:flex;align-items:center;gap:6px}
+    .feat-section-title::before{content:'';width:3px;height:10px;border-radius:2px;background:linear-gradient(var(--o1),var(--r1));display:block}
+    .feat-more-btn{font-size:11px;color:var(--o2);background:none;border:none;cursor:pointer;font-family:var(--mono);padding:2px 0;transition:opacity 0.15s;font-weight:600}
+    .feat-more-btn:hover{opacity:0.7}
+    .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+    .feat-card{background:var(--bg1);border:1px solid var(--line);border-radius:13px;padding:13px 13px 11px;cursor:pointer;transition:all 0.18s;position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(200,100,0,0.05)}
+    .feat-card::before{content:'';position:absolute;inset:0;opacity:0;background:linear-gradient(135deg,rgba(255,150,0,0.06),rgba(212,0,31,0.03));transition:opacity 0.18s}
+    .feat-card:hover{border-color:rgba(232,92,0,0.35);transform:translateY(-2px);box-shadow:0 6px 18px rgba(200,80,0,0.12)}
+    .feat-card:hover::before{opacity:1}
+    .feat-card:active{transform:translateY(0)}
+    .feat-card.hidden-card{display:none}
+    .feat-card.hidden-card.show{display:block;animation:fadeSlideIn 0.22s ease}
+    .feat-icon{width:32px;height:32px;border-radius:9px;margin-bottom:9px;display:flex;align-items:center;justify-content:center;font-size:16px}
+    .feat-icon.orange{background:rgba(255,107,0,0.12)}
+    .feat-icon.red{background:rgba(212,0,31,0.09)}
+    .feat-icon.gold{background:rgba(204,136,0,0.11)}
+    .feat-icon.green{background:rgba(56,142,60,0.1)}
+    .feat-icon.blue{background:rgba(21,101,192,0.09)}
+    .feat-icon.purple{background:rgba(123,31,162,0.09)}
+    .feat-name{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .feat-badge{font-size:9px;padding:2px 6px;border-radius:7px;font-weight:600;font-family:var(--mono)}
+    .feat-badge.hot{background:rgba(212,0,31,0.09);color:var(--r1);border:1px solid rgba(212,0,31,0.18)}
+    .feat-badge.new{background:rgba(255,107,0,0.1);color:var(--o1);border:1px solid rgba(255,107,0,0.2)}
+    .feat-desc{font-size:11px;color:var(--t3);line-height:1.6}
+    .chat-home-sidebar{border-left:1px solid var(--line);background:var(--bg1);overflow-y:auto;padding:20px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:-2px 0 8px rgba(200,100,0,0.04)}
+    .chat-home-sidebar::-webkit-scrollbar{width:3px}
+    .chat-home-sidebar::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+    .sidebar-sec-title{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:1.2px;text-transform:uppercase;font-family:var(--mono);display:flex;align-items:center;gap:6px;margin-bottom:2px}
+    .sidebar-sec-title::before{content:'';width:3px;height:10px;border-radius:2px;background:linear-gradient(var(--o1),var(--r1));display:block}
+    .suggest-item{padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);font-size:12px;color:var(--t2);cursor:pointer;transition:all 0.15s;line-height:1.5;display:flex;align-items:flex-start;gap:6px}
+    .suggest-item:hover{border-color:rgba(232,92,0,0.35);color:var(--o2);background:rgba(255,150,0,0.07)}
+    .suggest-item:hover .suggest-arrow{opacity:1}
+    .suggest-arrow{color:var(--o1);font-size:12px;flex-shrink:0;opacity:0;transition:opacity 0.15s;margin-top:0}
+    .suggest-divider{height:1px;background:var(--line);margin:2px 0}
+    .suggest-group-title{font-size:10px;color:var(--t3);font-family:var(--mono);padding:2px 2px 0}
+    /* 🍽️ 米其林助手 */
+    .michelin-section{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+    .michelin-header{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--o2);margin-bottom:10px;font-family:var(--mono)}
+    .michelin-header::before{content:'🍽️';font-size:14px}
+    .michelin-input-wrap{display:flex;gap:6px;margin-bottom:8px}
+    .michelin-input{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12px;font-family:var(--sans);color:var(--t1);outline:none}
+    .michelin-input:focus{border-color:rgba(232,92,0,0.5);box-shadow:0 0 0 2px rgba(232,92,0,0.1)}
+    .michelin-btn{background:linear-gradient(135deg,var(--o1),var(--r1));border:none;border-radius:9px;padding:0 12px;color:white;font-weight:bold;font-size:12px;cursor:pointer;transition:opacity 0.1s}
+    .michelin-btn:active{opacity:0.7}
+    .michelin-answer{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:11px;color:var(--t1);line-height:1.6;max-height:200px;overflow-y:auto;margin-top:8px}
+    .michelin-answer p{margin:0 0 6px 0}
+    .michelin-ref{font-size:10px;color:var(--t3);border-top:1px dashed var(--line);margin-top:6px;padding-top:5px}
+    /* 对话区 */
+    .chat-conv-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;background:var(--bg0)}
+    .chat-conv-area::-webkit-scrollbar{width:3px}
+    .chat-conv-area::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+    .msg{display:flex;gap:10px;max-width:720px}
+    .msg.user{align-self:flex-end;flex-direction:row-reverse}
+    .msg-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:2px}
+    .msg.user .msg-avatar{background:linear-gradient(135deg,var(--o1),var(--r1))}
+    .msg.bot .msg-avatar{background:var(--bg3);border:1px solid var(--line2)}
+    .msg-body{display:flex;flex-direction:column;gap:5px;max-width:calc(100% - 40px)}
+    .msg-text{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.7}
+    .msg.user .msg-text{background:rgba(255,107,0,0.09);border:1px solid rgba(255,107,0,0.22);border-bottom-right-radius:4px;color:var(--t1)}
+    .msg.bot .msg-text{background:var(--bg1);border:1px solid var(--line);border-bottom-left-radius:4px;white-space:pre-wrap;color:var(--t1);box-shadow:0 1px 6px rgba(200,100,0,0.06)}
+    .msg-time{font-size:10px;color:var(--t3);font-family:var(--mono);padding:0 4px}
+    .msg.user .msg-time{text-align:right}
+    .chat-route{background:var(--bg1);border:1px solid var(--line2);border-radius:12px;overflow:hidden;margin-top:4px;min-width:300px;box-shadow:0 2px 10px rgba(200,100,0,0.07)}
+    .chat-route .cr-head{padding:9px 13px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600;background:var(--bg2);color:var(--t1)}
+    .chat-route .cr-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line)}
+    .chat-route .cr-metric{background:var(--bg1);padding:9px 11px}
+    .chat-route .cr-metric .v{font-size:17px;font-weight:700;font-family:var(--mono);color:var(--o1)}
+    .chat-route .cr-metric .v .u{font-size:11px;color:var(--t2);font-family:var(--sans)}
+    .chat-route .cr-metric .l{font-size:10px;color:var(--t3);margin-top:2px}
+    .chat-route .cr-steps{max-height:170px;overflow-y:auto;background:var(--bg1)}
+    .chat-route .cr-step{padding:6px 13px;border-bottom:1px solid var(--line);font-size:12px;color:var(--t2);display:flex;gap:8px}
+    .chat-route .cr-step:last-child{border-bottom:none}
+    .chat-route .cr-step .sn{font-family:var(--mono);color:var(--t3);font-size:10px;flex-shrink:0;margin-top:1px}
+    .chat-route .cr-footer{padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);background:var(--bg2)}
+    .chat-route .cr-footer a{font-size:11px;color:var(--o2);text-decoration:none;font-weight:600}
+    .chat-route .cr-footer a:hover{text-decoration:underline}
+    .chat-input-bar{padding:12px 15px;border-top:1px solid var(--line2);background:var(--bg1);display:flex;gap:10px;align-items:flex-end;flex-shrink:0;box-shadow:0 -2px 10px rgba(200,100,0,0.05)}
+    .chat-textarea-wrap{flex:1}
+    .chat-textarea{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:11px;color:var(--t1);font-family:var(--sans);font-size:13px;padding:10px 13px;resize:none;outline:none;max-height:120px;line-height:1.5;transition:border-color 0.15s,box-shadow 0.15s;display:block}
+    .chat-textarea::placeholder{color:var(--t3)}
+    .chat-textarea:focus{border-color:rgba(232,92,0,0.4);box-shadow:0 0 0 3px rgba(232,92,0,0.07)}
+    .chat-send{width:40px;height:40px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--o1),var(--r1));color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:opacity 0.15s,transform 0.1s;box-shadow:0 2px 10px rgba(255,107,0,0.28)}
+    .chat-send:hover{opacity:0.88}
+    .chat-send:active{transform:scale(0.95)}
+    .chat-send:disabled{opacity:0.3;cursor:not-allowed}
+    .typing-dots{display:flex;gap:4px;padding:14px;align-items:center}
+    .typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--o1);animation:bounce 1.2s ease-in-out infinite}
+    .typing-dots span:nth-child(2){animation-delay:0.2s}
+    .typing-dots span:nth-child(3){animation-delay:0.4s}
+    ::-webkit-scrollbar{width:3px;height:3px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+    .workspace::before{content:'';position:fixed;bottom:20px;right:20px;width:200px;height:200px;background:radial-gradient(circle,rgba(255,150,50,0.05) 0%,transparent 70%);pointer-events:none}
+    .map-radio-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px}
+    .map-provider-tip{font-size:10px;color:var(--t3);font-family:var(--mono);text-align:center;padding:2px 0}
+    .cr-map-btns{display:flex;gap:5px;flex-wrap:wrap}
+    .cr-map-btn{font-size:11px;padding:3px 9px;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);color:var(--t2);text-decoration:none;transition:all 0.15s;white-space:nowrap}
+    .cr-map-btn:hover{border-color:rgba(232,92,0,0.4);color:var(--o2);background:rgba(255,150,0,0.08)}
+    .cr-map-btn.cr-map-active{border-color:rgba(255,107,0,0.5);color:var(--o1);background:rgba(255,107,0,0.1);font-weight:600}
+    /* Agent UI */
+    .agent-card{background:var(--bg1);border:1px solid rgba(255,149,0,0.32);border-radius:14px;overflow:hidden;min-width:300px;max-width:580px;box-shadow:0 3px 14px rgba(200,80,0,0.09)}
+    .agent-hd{padding:10px 14px;background:linear-gradient(90deg,rgba(255,150,0,0.08),transparent);border-bottom:1px solid rgba(255,149,0,0.18);display:flex;align-items:center;gap:8px}
+    .agent-hd-pulse{width:8px;height:8px;border-radius:50%;background:var(--o1);box-shadow:0 0 6px var(--o1);flex-shrink:0}
+    .agent-hd-pulse.done{background:#388E3C;box-shadow:0 0 6px #388E3C;animation:none}
+    .agent-hd-pulse.anim{animation:think-pulse .9s ease-in-out infinite}
+    .agent-hd-title{font-size:12px;font-weight:700;color:var(--o1);font-family:var(--mono);letter-spacing:.6px}
+    .agent-hd-badge{margin-left:auto;font-size:10px;padding:2px 9px;border-radius:10px;font-family:var(--mono);font-weight:600;border:1px solid}
+    .agent-hd-badge.running{background:rgba(255,149,0,0.1);color:var(--o2);border-color:rgba(255,149,0,0.3);animation:blink 1.4s ease-in-out infinite}
+    .agent-hd-badge.done{background:rgba(56,142,60,0.09);color:#388E3C;border-color:rgba(56,142,60,0.22);animation:none}
+    .agent-hd-badge.error{background:rgba(212,0,31,0.07);color:var(--r1);border-color:rgba(212,0,31,0.2);animation:none}
+    .agent-steps-list{padding:2px 0}
+    .agent-step{display:flex;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
+    .agent-step:last-child{border-bottom:none}
+    .astep-left{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;padding-top:2px}
+    .astep-dot{width:8px;height:8px;border-radius:50%}
+    .astep-dot.running{background:var(--o1);animation:think-pulse .8s ease-in-out infinite}
+    .astep-dot.done{background:#388E3C}
+    .astep-dot.error{background:var(--r1)}
+    .astep-ico{font-size:17px;line-height:1}
+    .astep-body{flex:1;min-width:0}
+    .astep-title{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+    .astep-chip{font-size:10px;color:var(--t2);font-family:var(--mono);background:var(--bg3);padding:1px 6px;border-radius:4px;border:1px solid var(--line)}
+    .astep-result{font-size:12px;color:var(--t2);line-height:1.7;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .astep-loading{color:var(--t3);font-family:var(--mono);letter-spacing:3px;animation:blink .8s step-end infinite}
+    .atag{font-size:10px;padding:1px 7px;border-radius:6px;font-weight:600;border:1px solid}
+    .atag.ok{background:rgba(56,142,60,0.09);color:#388E3C;border-color:rgba(56,142,60,0.2)}
+    .atag.warn{background:rgba(255,107,0,0.09);color:var(--o2);border-color:rgba(255,107,0,0.22)}
+    .atag.info{background:rgba(21,101,192,0.08);color:#1565C0;border-color:rgba(21,101,192,0.2)}
+    .ametrics{font-family:var(--mono);font-size:11px;color:var(--o2);background:rgba(255,107,0,0.08);padding:1px 7px;border-radius:5px;border:1px solid rgba(255,107,0,0.2)}
+    .aplace{background:var(--bg2);border:1px solid var(--line2);border-radius:5px;padding:1px 7px;font-size:11px;color:var(--t1)}
+    .amaplink{font-size:11px;color:var(--o2);text-decoration:none;border:1px solid rgba(255,107,0,0.3);padding:1px 7px;border-radius:5px;white-space:nowrap;transition:all .15s;font-weight:600}
+    .amaplink:hover{background:rgba(255,107,0,0.08)}
+    .agent-final-wrap{border-top:1px solid rgba(255,149,0,0.2);background:rgba(255,150,0,0.04)}
+    .agent-final-hd{padding:7px 14px;font-size:11px;font-weight:700;color:var(--o2);font-family:var(--mono);background:rgba(255,149,0,0.07);letter-spacing:.5px;border-bottom:1px solid rgba(255,149,0,0.13)}
+    .agent-final-body{padding:12px 14px;font-size:13px;color:var(--t1);line-height:1.9;white-space:pre-wrap}
+    .agent-toggle-btn{width:36px;height:36px;border-radius:9px;border:1px solid var(--line2);background:var(--bg2);color:var(--t3);font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s;position:relative}
+    .agent-toggle-btn:hover{border-color:rgba(232,92,0,0.4);color:var(--o2)}
+    .agent-toggle-btn.agent-on{background:linear-gradient(135deg,var(--o1),var(--r1));color:#fff;border-color:transparent;box-shadow:0 2px 10px rgba(255,107,0,0.32)}
+    .agent-on-label{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--o2);font-family:var(--mono);white-space:nowrap;background:var(--bg1);padding:1px 5px;border-radius:4px;border:1px solid rgba(255,149,0,0.3);pointer-events:none}
+  /* 🍊 出游人格系统 */
+  .persona-wrap{margin-top:4px}
+  .persona-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+  .persona-btn{height:40px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);color:var(--t2);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:var(--sans)}
+  .persona-btn:hover{transform:translateY(-2px);border-color:rgba(255,107,0,.35);background:rgba(255,150,0,.08);color:var(--o2)}
+  .persona-btn.active{background:linear-gradient(135deg,rgba(255,107,0,.14),rgba(212,0,31,.08));border-color:rgba(255,107,0,.45);color:var(--o1);box-shadow:0 4px 14px rgba(255,107,0,.12)}
+  .persona-tip{margin-top:10px;padding:10px 12px;border-radius:11px;background:linear-gradient(135deg,rgba(255,150,0,.06),rgba(255,255,255,.7));border:1px solid rgba(255,150,0,.16);font-size:11px;line-height:1.8;color:var(--t2)}
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="top-logo">🍊</div>
+  <span class="top-name">马到橙功</span>
+  <span class="top-tag">百度地图 × DeepSeek AI</span>
+  <div class="mode-switcher">
+    <button class="mode-btn active" id="modeFormBtn" onclick="switchMode('form')"><span class="dot"></span>表单规划</button>
+    <button class="mode-btn" id="modeChatBtn" onclick="switchMode('chat')"><span class="dot"></span>智能对话</button>
+  </div>
+  <div class="top-status" id="topStatus">就绪</div>
+</header>
+
+<div class="workspace">
+  <aside class="sidebar">
+    <div class="mascot-wrap">
+      <svg class="mascot-svg state-idle" id="mascotSvg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <g id="mascot-body">
+          <circle cx="50" cy="54" r="32" fill="url(#ogGrad)"/>
+          <ellipse cx="40" cy="38" rx="9" ry="6" fill="rgba(255,255,255,0.18)" transform="rotate(-20,40,38)"/>
+          <line x1="50" y1="22" x2="50" y2="86" stroke="rgba(200,80,0,0.18)" stroke-width="1.5"/>
+          <path d="M20 50 Q50 30 80 50" stroke="rgba(200,80,0,0.15)" stroke-width="1.5" fill="none"/>
+          <path d="M20 58 Q50 78 80 58" stroke="rgba(200,80,0,0.15)" stroke-width="1.5" fill="none"/>
+          <ellipse cx="50" cy="20" rx="6" ry="3" fill="#4CAF50" transform="rotate(-30,50,20)"/>
+          <ellipse cx="53" cy="18" rx="7" ry="3" fill="#66BB6A" transform="rotate(15,53,18)"/>
+          <line x1="50" y1="22" x2="50" y2="14" stroke="#5D4037" stroke-width="2" stroke-linecap="round"/>
+          <ellipse cx="41" cy="52" rx="4.5" ry="5" fill="white"/>
+          <ellipse cx="59" cy="52" rx="4.5" ry="5" fill="white"/>
+          <circle cx="42" cy="53" r="2.5" fill="#2C1810"/>
+          <circle cx="60" cy="53" r="2.5" fill="#2C1810"/>
+          <circle cx="43" cy="52" r="1" fill="white"/>
+          <circle cx="61" cy="52" r="1" fill="white"/>
+          <path d="M44 62 Q50 68 56 62" stroke="#9E4A00" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="35" cy="60" rx="5" ry="3" fill="rgba(255,100,50,0.25)"/>
+          <ellipse cx="65" cy="60" rx="5" ry="3" fill="rgba(255,100,50,0.25)"/>
+        </g>
+        <g id="prop-cycle" style="display:none">
+          <circle cx="35" cy="85" r="10" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
+          <circle cx="65" cy="85" r="10" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
+          <circle cx="35" cy="85" r="2" fill="#FF6B00"/><circle cx="65" cy="85" r="2" fill="#FF6B00"/>
+          <line x1="35" y1="75" x2="50" y2="68" stroke="#FF6B00" stroke-width="2"/>
+          <line x1="50" y1="68" x2="65" y2="75" stroke="#FF6B00" stroke-width="2"/>
+          <line x1="50" y1="68" x2="50" y2="60" stroke="#FF6B00" stroke-width="2"/>
+          <line x1="45" y1="62" x2="55" y2="62" stroke="#FF6B00" stroke-width="2.5" stroke-linecap="round"/>
+          <g style="transform-origin:35px 85px;animation:spin-wheel 0.4s linear infinite"><line x1="35" y1="75" x2="35" y2="95" stroke="rgba(255,107,0,0.5)" stroke-width="1"/><line x1="25" y1="85" x2="45" y2="85" stroke="rgba(255,107,0,0.5)" stroke-width="1"/></g>
+          <g style="transform-origin:65px 85px;animation:spin-wheel 0.4s linear infinite"><line x1="65" y1="75" x2="65" y2="95" stroke="rgba(255,107,0,0.5)" stroke-width="1"/><line x1="55" y1="85" x2="75" y2="85" stroke="rgba(255,107,0,0.5)" stroke-width="1"/></g>
+        </g>
+        <g id="prop-fly" style="display:none">
+          <path d="M15 80 L50 65 L85 80 L50 72 Z" fill="#FFB340" opacity="0.8"/>
+          <path d="M30 70 L50 60 L70 70 L50 66 Z" fill="#FF9500"/>
+          <rect x="47" y="58" width="6" height="15" rx="3" fill="#FF6B00"/>
+          <g style="animation:float-cloud 2s ease-in-out infinite">
+            <ellipse cx="20" cy="40" rx="8" ry="5" fill="rgba(200,100,0,0.12)"/>
+            <ellipse cx="80" cy="30" rx="9" ry="5" fill="rgba(200,100,0,0.08)"/>
+          </g>
+        </g>
+        <g id="prop-weather" style="display:none">
+          <path d="M50 85 L50 68" stroke="#FF6B00" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M30 68 Q50 45 70 68 Z" fill="rgba(255,107,0,0.7)" stroke="#FF6B00" stroke-width="1.5"/>
+          <line x1="22" y1="72" x2="20" y2="82" stroke="rgba(50,100,255,0.45)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="72" y1="72" x2="70" y2="82" stroke="rgba(50,100,255,0.45)" stroke-width="1.5" stroke-linecap="round"/>
+        </g>
+        <g id="prop-think" style="display:none">
+          <circle cx="68" cy="30" r="12" fill="rgba(255,149,0,0.12)" stroke="rgba(255,149,0,0.35)" stroke-width="1.5"/>
+          <text x="68" y="34" text-anchor="middle" font-size="12">💭</text>
+          <circle cx="62" cy="42" r="3" fill="rgba(255,149,0,0.28)"/>
+          <circle cx="58" cy="47" r="2" fill="rgba(255,149,0,0.18)"/>
+        </g>
+        <g id="prop-cheer" style="display:none">
+          <text x="20" y="30" font-size="12">🎉</text>
+          <text x="68" y="28" font-size="12">⭐</text>
+          <text x="14" y="70" font-size="10">✨</text>
+          <text x="76" y="72" font-size="10">🎊</text>
+        </g>
+        <defs>
+          <radialGradient id="ogGrad" cx="40%" cy="35%" r="60%">
+            <stop offset="0%" stop-color="#FFB340"/>
+            <stop offset="50%" stop-color="#FF7A00"/>
+            <stop offset="100%" stop-color="#D45000"/>
+          </radialGradient>
+        </defs>
+      </svg>
+      <div class="mascot-state" id="mascotState">🍊 待命中</div>
+    </div>
+    <div class="divider"></div>
+    <div>
+      <div class="sec-head">出发地点</div>
+      <div class="field"><label>城市</label><input id="city" type="text" value="上海" placeholder="上海"></div>
+      <div class="field"><label>起点（留空默认人民广场）</label><input id="startAddr" type="text" placeholder="例：虹桥火车站"></div>
+      <div class="field"><label>终点 *</label><input id="destAddr" type="text" placeholder="例：外滩、迪士尼乐园"></div>
+    </div>
+    <div class="divider"></div>
+    <div>
+      <div class="sec-head">骑行方式</div>
+      <div class="seg">
+        <button class="seg-btn on-orange" id="btnBike" onclick="setRideType('bike')">🚲 自行车</button>
+        <button class="seg-btn" id="btnEbike" onclick="setRideType('ebike')">⚡ 电动车</button>
+      </div>
+    </div>
+    <div>
+      <div class="sec-head" style="margin-top:4px">算路偏好</div>
+      <div class="seg">
+        <button class="seg-btn on-red" id="btnDefault" onclick="setRoad(0)">默认路线</button>
+        <button class="seg-btn" id="btnSafe" onclick="setRoad(3)">避逆行台阶</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <!-- 🍊 出游人格系统 -->
+    <div class="persona-wrap">
+      <div class="sec-head">🍊 出游人格</div>
+      <div class="persona-grid">
+        <button class="persona-btn active" onclick="setPersona('relax',this)">😌 松弛感</button>
+        <button class="persona-btn" onclick="setPersona('special',this)">⚡ 特种兵</button>
+        <button class="persona-btn" onclick="setPersona('romantic',this)">💕 情侣</button>
+        <button class="persona-btn" onclick="setPersona('introvert',this)">🌙 i人</button>
+        <button class="persona-btn" onclick="setPersona('socialfear',this)">🙈 社恐</button>
+        <button class="persona-btn" onclick="setPersona('student',this)">🎓 穷游大学生</button>
+      </div>
+      <div class="persona-tip" id="personaTip">🍊 已启用「松弛感模式」 自动推荐低压力路线与轻节奏玩法</div>
+    </div>
+    <div class="divider"></div>
+    <div>
+      <div class="sec-head">AI 语言</div>
+      <div class="field"><select id="aiLang"><option value="zh">中文</option><option value="en">English</option></select></div>
+    </div>
+    <div>
+      <div class="sec-head">导航地图</div>
+      <div class="map-radio-grid">
+        <button class="seg-btn map-radio-btn on-orange" data-map="baidu"   onclick="setMapProvider('baidu')">🗺️ 百度</button>
+        <button class="seg-btn map-radio-btn"           data-map="gaode"   onclick="setMapProvider('gaode')">📍 高德</button>
+        <button class="seg-btn map-radio-btn"           data-map="google"  onclick="setMapProvider('google')">🌐 谷歌</button>
+        <button class="seg-btn map-radio-btn"           data-map="meituan" onclick="setMapProvider('meituan')">🛵 美团</button>
+      </div>
+      <div class="map-provider-tip" id="mapProviderTip">路线规划完成后自动跳转</div>
+    </div>
+    <button class="run-btn" id="runBtn" onclick="runForm()">🍊 马到橙功！</button>
+    <div class="hint-text">后端：<code>http://127.0.0.1:5000</code><br>启动：<code>python app.py</code></div>
+  </aside>
+
+  <!-- ── FORM PANEL ── -->
+  <div class="panel" id="formPanel">
+    <div class="result-panel" id="resultPanel">
+      <div class="empty-state" id="emptyForm">
+        <div class="empty-emoji">🗺️</div>
+        <div class="slogan">马到橙功</div>
+        <p>输入起终点，点击按钮，AI 将为你规划最优骑行方案，并给出专业行程分析。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CHAT PANEL ── -->
+  <div class="panel hidden" id="chatPanel">
+    <div class="chat-home" id="chatHome">
+      <div class="chat-home-main">
+        <div class="chat-hero">
+          <div class="chat-hero-title">🍊 马到橙功 Agent</div>
+          <div class="chat-hero-sub">骑行路线 · 天气查询 · 热量计算 · 骑行百科</div>
+        </div>
+        <div class="chat-searchbar-wrap">
+          <input class="chat-searchbar" id="chatHomeInput" placeholder="告诉我你想骑去哪里，或查询城市天气..." onkeydown="homeInputKeydown(event)">
+          <button class="chat-searchbar-btn" onclick="submitHomeInput()">➤</button>
+        </div>
+        <div class="chat-toolbar">
+          <button class="toolbar-chip hot" onclick="fillChatAndSend('从人民广场骑到外滩怎么走')"><span class="chip-icon">🚲</span>骑行路线</button>
+          <button class="toolbar-chip" onclick="fillChatAndSend('上海今天天气怎么样，适合骑行吗')"><span class="chip-icon">🌤️</span>天气查询</button>
+          <button class="toolbar-chip" onclick="fillChatAndSend('骑行10公里消耗多少卡路里，需要多长时间')"><span class="chip-icon">🔥</span>热量计算</button>
+          <button class="toolbar-chip" onclick="fillChatAndSend('骑行前需要检查哪些装备和注意事项')"><span class="chip-icon">🎒</span>装备清单</button>
+          <button class="toolbar-chip" onclick="fillChatAndSend('推荐上海适合休闲骑行的路线和景点')"><span class="chip-icon">🏆</span>路线推荐</button>
+          <button class="toolbar-chip" id="moreChipBtn" onclick="toggleMoreCards()"><span class="chip-icon">···</span>更多</button>
+        </div>
+        <div>
+          <div class="feat-section-head">
+            <div class="feat-section-title">核心功能</div>
+            <button class="feat-more-btn" id="featMoreBtn" onclick="toggleMoreCards()">展开更多 ↓</button>
+          </div>
+          <div class="feat-grid" id="featGrid">
+            <div class="feat-card" onclick="fillChatAndSend('帮我规划一条骑行路线，起点人民广场，终点外滩')"><div class="feat-icon orange">🚲</div><div class="feat-name">骑行路线规划<span class="feat-badge hot">热门</span></div><div class="feat-desc">输入起终点，AI 自动规划最优骑行方案</div></div>
+            <div class="feat-card" onclick="fillChatAndSend('上海今天天气怎么样，适合骑行出门吗')"><div class="feat-icon blue">🌤️</div><div class="feat-name">实时天气查询</div><div class="feat-desc">出发前查全球任意城市实时天气与骑行指数</div></div>
+            <div class="feat-card" onclick="fillChatAndSend('骑行10公里大概消耗多少热量，需要多长时间')"><div class="feat-icon gold">🔥</div><div class="feat-name">热量消耗计算<span class="feat-badge new">新</span></div><div class="feat-desc">输入距离，精准估算骑行热量消耗</div></div>
+            <div class="feat-card" onclick="fillChatAndSend('骑行出发前需要检查哪些装备，列一个清单')"><div class="feat-icon green">🎒</div><div class="feat-name">出行装备清单</div><div class="feat-desc">按骑行类型生成个性化装备检查提醒</div></div>
+            <div class="feat-card" onclick="fillChatAndSend('推荐上海适合周末骑行的精华路线和打卡景点')"><div class="feat-icon orange">🗺️</div><div class="feat-name">景点路线推荐</div><div class="feat-desc">发现城市骑行精华路线与沿途打卡地</div></div>
+            <div class="feat-card" onclick="fillChatAndSend('骑行途中遇到爆胎或突发情况怎么处理')"><div class="feat-icon red">🚑</div><div class="feat-name">应急处置指南</div><div class="feat-desc">突发情况紧急处理与安全骑行须知</div></div>
+            <div class="feat-card hidden-card" onclick="fillChatAndSend('骑行提速技巧有哪些，怎么提升骑行效率')"><div class="feat-icon purple">🏆</div><div class="feat-name">骑行技巧进阶</div><div class="feat-desc">从新手到高手，系统提升骑行技能</div></div>
+            <div class="feat-card hidden-card" onclick="fillChatAndSend('附近哪里可以停共享单车，怎么找停车点')"><div class="feat-icon blue">🅿️</div><div class="feat-name">停车点查询</div><div class="feat-desc">查找附近共享单车停放与取还车位置</div></div>
+            <div class="feat-card hidden-card" onclick="fillChatAndSend('骑行前要做哪些热身运动，骑完如何拉伸')"><div class="feat-icon gold">💪</div><div class="feat-name">热身拉伸指导</div><div class="feat-desc">科学热身与拉伸，预防骑行运动损伤</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-home-sidebar">
+        <div class="sidebar-sec-title">建议追问</div>
+        <div class="suggest-item" onclick="fillChatAndSend('今天上海天气适合骑行吗')"><span class="suggest-arrow">›</span>今天适合骑行吗？</div>
+        <div class="suggest-item" onclick="fillChatAndSend('附近有哪些好的骑行路线推荐')"><span class="suggest-arrow">›</span>附近有哪些好骑行路线？</div>
+        <div class="suggest-item" onclick="fillChatAndSend('骑行15公里大概消耗多少卡路里')"><span class="suggest-arrow">›</span>骑15km消耗多少卡路里？</div>
+        <div class="suggest-item" onclick="fillChatAndSend('骑行需要带哪些基本装备和工具')"><span class="suggest-arrow">›</span>骑行需要带哪些装备？</div>
+        <div class="suggest-item" onclick="fillChatAndSend('电动车和普通自行车骑行哪个更省力省时')"><span class="suggest-arrow">›</span>电动车 vs 自行车哪个好？</div>
+        <div class="suggest-item" onclick="fillChatAndSend('早晨还是傍晚骑行更好，最佳骑行时段')"><span class="suggest-arrow">›</span>最佳骑行时间是什么时候？</div>
+        <div class="suggest-divider"></div>
+        <div class="suggest-group-title">🌤️ 天气快查</div>
+        <div class="suggest-item" onclick="fillChatAndSend('北京今天天气怎么样')"><span class="suggest-arrow">›</span>北京今天天气</div>
+        <div class="suggest-item" onclick="fillChatAndSend('成都今天天气怎么样')"><span class="suggest-arrow">›</span>成都今天天气</div>
+        <div class="suggest-item" onclick="fillChatAndSend('Tokyo today weather')"><span class="suggest-arrow">›</span>Tokyo 今天天气</div>
+        <div class="suggest-item" onclick="fillChatAndSend('London today weather')"><span class="suggest-arrow">›</span>London 今天天气</div>
+        <div class="suggest-divider"></div>
+        <div class="suggest-group-title">🚲 热门路线</div>
+        <div class="suggest-item" onclick="fillChatAndSend('上海外滩到陆家嘴骑行路线怎么走')"><span class="suggest-arrow">›</span>外滩 → 陆家嘴</div>
+        <div class="suggest-item" onclick="fillChatAndSend('从西湖景区骑行到灵隐寺路线')"><span class="suggest-arrow">›</span>西湖 → 灵隐寺</div>
+        <div class="suggest-item" onclick="fillChatAndSend('天安门到颐和园骑行路线规划')"><span class="suggest-arrow">›</span>天安门 → 颐和园</div>
+        <div class="suggest-item" onclick="fillChatAndSend('虹桥火车站到迪士尼乐园骑行路线')"><span class="suggest-arrow">›</span>虹桥站 → 迪士尼</div>
+        <!-- 🍽️ 米其林助手 -->
+        <div class="michelin-section">
+          <div class="michelin-header">米其林智能助手</div>
+          <div class="michelin-input-wrap">
+            <input type="text" id="michelinQuestion" class="michelin-input" placeholder="例如：上海有哪些米其林三星餐厅？" onkeypress="if(event.key==='Enter') askMichelin()">
+            <button class="michelin-btn" onclick="askMichelin()">问</button>
+          </div>
+          <div id="michelinAnswer" class="michelin-answer" style="display:none"></div>
+          <!-- ✅ 附近米其林按钮 -->
+          <button class="michelin-btn" style="width:100%;margin-top:6px;height:32px;font-size:11px"
+            onclick="findNearestMichelin()">📍 查找附近米其林餐厅</button>
+          <div id="nearestAnswer" class="michelin-answer" style="display:none"></div>
+        </div>
+        <!-- ✅ 历史记录面板 -->
+        <div class="michelin-section" id="historyPanel" style="display:none">
+          <div class="michelin-header" style="justify-content:space-between">
+            💬 本次对话记忆
+            <button onclick="clearHistory();document.getElementById('historyPanel').style.display='none'"
+              style="font-size:10px;background:none;border:1px solid var(--line);border-radius:4px;padding:1px 6px;cursor:pointer;color:var(--t3)">清空</button>
+          </div>
+          <div id="historyList" style="font-size:11px;color:var(--t2);line-height:1.8;max-height:150px;overflow-y:auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-conv-area" id="chatMessages" style="display:none"></div>
+    <div class="chat-input-bar" id="chatInputBar" style="display:none">
+      <button class="agent-toggle-btn" id="agentToggleBtn" onclick="toggleAgentMode()" title="开启 DeepSeek Agent 多步推理">⚡</button>
+      <div class="chat-textarea-wrap">
+        <textarea class="chat-textarea" id="chatInput" rows="1" placeholder="继续提问，例如：今天天气适合骑行吗？" onkeydown="chatKeydown(event)" oninput="autoResize(this)"></textarea>
+      </div>
+      <button class="chat-send" id="chatSendBtn" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════
+   全局配置
+══════════════════════════════ */
+const BACKEND = 'http://127.0.0.1:5000';
+let rideType  = 0, roadPref = 0;
+let chatBusy  = false, moreCardsOpen = false;
+let mapProvider = 'baidu', currentTransportMode = 'riding';
+let agentMode = false, agentCounter = 0;
+
+/* 🍊 出游人格系统 */
+let currentPersona = 'relax';
+const PERSONA_CONFIG = {
+  relax:     {name:'松弛感模式',    tip:'🍊 已启用「松弛感模式」 自动推荐低压力路线与轻节奏玩法'},
+  special:   {name:'特种兵模式',    tip:'🍊 已启用「特种兵模式」 优先高效率、多景点、极限时间规划'},
+  romantic:  {name:'情侣浪漫模式',  tip:'🍊 已启用「情侣模式」 自动增加夜景、美食与拍照路线'},
+  introvert: {name:'i人模式',       tip:'🍊 已启用「i人模式」 自动避开人群与热门路线'},
+  socialfear:{name:'社恐模式',      tip:'🍊 已启用「社恐模式」 自动减少排队与高社交场景'},
+  student:   {name:'穷游大学生模式', tip:'🍊 已启用「穷游模式」 自动优化预算与高性价比玩法'},
+};
+function setPersona(type, el) {
+  currentPersona = type;
+  document.querySelectorAll('.persona-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('personaTip').innerText = PERSONA_CONFIG[type].tip;
+}
+
+/* 🍊 人格自动识别（用户输入关键词时自动切换） */
+function autoDetectPersona(text) {
+  if (/不想.*人多|人太多|避开.*人群|安静|小众|不想排队/.test(text)) return 'introvert';
+  if (/社恐|不想.*说话|低调|不互动/.test(text)) return 'socialfear';
+  if (/穷|学生|省钱|便宜|预算少|平价|性价比/.test(text)) return 'student';
+  if (/情侣|约会|浪漫|夜景|拍照|纪念|两人/.test(text)) return 'romantic';
+  if (/特种兵|高效|多景点|极限|塞满|全部都去/.test(text)) return 'special';
+  if (/松弛|慢|不赶|舒适|放松|随意/.test(text)) return 'relax';
+  return null;
+}
+// ✅ 多轮对话记忆（最近50轮，按会话保存）
+let chatHistory = [];   // [{role:'user'|'assistant', content:'...'}]
+let sessionHistory = {}; // 按 sessionId 保存的历史记录列表
+
+const TRANSPORT_MODE_MAP = {
+  riding:  {baidu:'riding', gaode:'bicycle', google:'bicycling', meituan:'bicycle', label:'🚲 骑行'},
+  driving: {baidu:'driving',gaode:'drive',   google:'driving',   meituan:'drive',   label:'🚗 驾车'},
+  walking: {baidu:'walking',gaode:'walk',    google:'walking',   meituan:'walk',    label:'🚶 步行'},
+  transit: {baidu:'transit',gaode:'bus',     google:'transit',   meituan:'bus',     label:'🚌 公交'},
+};
+const MAP_PROVIDERS = {
+  baidu:   {label:'百度地图',icon:'🗺️'},
+  gaode:   {label:'高德地图',icon:'📍'},
+  google:  {label:'谷歌地图',icon:'🌐'},
+  meituan: {label:'美团地图',icon:'🛵'},
+};
+
+/* ── 地图 URL ── */
+function getMapUrl(sN,sLat,sLng,dN,dLat,dLng,mode){
+  mode=mode||currentTransportMode||'riding';
+  const tm=TRANSPORT_MODE_MAP[mode]||TRANSPORT_MODE_MAP.riding;
+  const sn=encodeURIComponent(sN),dn=encodeURIComponent(dN);
+  switch(mapProvider){
+    case 'gaode':   return `https://www.amap.com/dir?from[name]=${sn}&to[name]=${dn}&type=${tm.gaode}`;
+    case 'google':  return `https://www.google.com/maps/dir/${sn}/${dn}/?travelmode=${tm.google}`;
+    case 'meituan': return `https://map.meituan.com/route/${tm.meituan}?from=${sn}&to=${dn}`;
+    default:        return `https://map.baidu.com/dir/?origin=latlng:${sLat},${sLng}|name:${sn}&destination=latlng:${dLat},${dLng}|name:${dn}&mode=${tm.baidu}&output=html`;
+  }
+}
+function getMapUrlForProvider(p,sN,sLat,sLng,dN,dLat,dLng,mode){
+  const saved=mapProvider; mapProvider=p;
+  const url=getMapUrl(sN,sLat,sLng,dN,dLat,dLng,mode);
+  mapProvider=saved; return url;
+}
+function setMapProvider(p){
+  mapProvider=p;
+  document.querySelectorAll('.map-radio-btn').forEach(b=>b.classList.toggle('on-orange',b.dataset.map===p));
+}
+
+/* ══ 橘子桌宠 ══ */
+const MASCOT_STATES={
+  idle:    {cls:'state-idle',    label:'🍊 待命中',   props:[]},
+  cycling: {cls:'state-cycling', label:'🚲 骑行中...', props:['prop-cycle']},
+  flying:  {cls:'state-flying',  label:'✈️ 起飞中...', props:['prop-fly']},
+  weather: {cls:'state-weather', label:'🌤️ 查天气...', props:['prop-weather']},
+  thinking:{cls:'state-thinking',label:'💭 思考中...', props:['prop-think']},
+  success: {cls:'state-success', label:'🎉 橙功达成！',props:['prop-cheer']},
+  error:   {cls:'state-error',   label:'😅 出错啦',   props:[]},
+};
+function setMascot(state){
+  const svg=document.getElementById('mascotSvg'),lbl=document.getElementById('mascotState');
+  const cfg=MASCOT_STATES[state]||MASCOT_STATES.idle;
+  svg.className='mascot-svg '+cfg.cls; lbl.textContent=cfg.label;
+  ['prop-cycle','prop-fly','prop-weather','prop-think','prop-cheer'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  cfg.props.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='block';});
+  const body=document.getElementById('mascot-body');
+  if(state==='cycling')body.setAttribute('transform','translate(0,-14)');
+  else if(state==='flying')body.setAttribute('transform','translate(0,-8)');
+  else body.setAttribute('transform','');
+}
+function inferMascot(t){
+  if(/天气|气温|下雨|晴|阴|温度|weather/.test(t))return'weather';
+  if(/机场|飞机|高铁|火车/.test(t))return'flying';
+  if(/骑|路线|导航|去哪|怎么走/.test(t))return'cycling';
+  return 'thinking';
+}
+
+/* ══ 本地意图识别 ══ */
+function localDetectIntent(text){
+  const t=text,city=(document.getElementById('city')?.value||'上海').replace('市','');
+  if(/天气|气温|下雨|晴天|阴天|温度|湿度|风力|体感|几度|weather/.test(t)){
+    let c=city;
+    const m1=t.match(/^([^\s，,。！!？?查询]+?)(?:的|今天|明天|现在)?天气/);
+    const m2=t.match(/查询?([^\s，,。！!？?的]+?)(?:的)?天气/);
+    const raw=(m1?.[1]||m2?.[1]||'').replace(/[的是怎么样查询今天明天现在]/g,'').trim();
+    if(raw.length>=2)c=raw;
+    return {intent:'weather',city:c};
+  }
+  if(/骑|路线|导航|怎么走|去哪|多远|前往|出发|到达/.test(t)||/从.+到|.+到.+怎/.test(t)){
+    const r=localExtractRoute(t,city);
+    if(r)return{intent:'route',...r};
+    return{intent:'route_maybe'};
+  }
+  return null;
+}
+function localExtractRoute(text,city){
+  let m=text.match(/从(.{2,10}?)(?:骑行?|出发|前往)?到(.{2,10}?)(?:怎么走|路线|骑行|多远|导航|$)/);
+  if(m)return{start:m[1].trim(),dest:m[2].trim(),city};
+  m=text.match(/^(.{2,10}?)(?:到|→|->|至|骑到)(.{2,10}?)(?:怎么走|路线|多远|骑行|导航)?$/);
+  if(m)return{start:m[1].trim(),dest:m[2].trim(),city};
+  m=text.match(/(?:去|骑去|前往|骑行到|导航到)(.{2,15}?)(?:$|怎么走|路线|多远)/);
+  if(m)return{start:'',dest:m[1].trim(),city};
+  m=text.match(/到(.{2,10}?)(?:怎么走|路线|多远|$)/);
+  if(m&&m[1].length>=2)return{start:'',dest:m[1].trim(),city};
+  return null;
+}
+function detectTransportMode(t){
+  if(/开车|驾车|自驾|打车|叫车|滴滴|出租/.test(t))return'driving';
+  if(/步行|走路|走过去|徒步|散步/.test(t))return'walking';
+  if(/公交|地铁|坐车|乘车|公共交通/.test(t))return'transit';
+  return 'riding';
+}
+
+/* ══ UI 工具 ══ */
+/* ✅ 检测是否需要定位（"附近/最近/离我近"等关键词）*/
+function needsLocation(text) {
+  return /附近|最近|离我|我在|我现在|周边|就近|哪里近|近的|nearby|near me/i.test(text);
+}
+
+/* ✅ 获取 GPS 坐标，返回 Promise<{lat,lng}|null> */
+function getGPS(timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+      ()   => resolve(null),
+      {timeout: timeoutMs, enableHighAccuracy: true}
+    );
+  });
+}
+
+function clearHistory(){
+  chatHistory=[];
+  console.log('🍊 对话历史已清空');
+}
+function switchMode(m){
+  document.getElementById('formPanel').classList.toggle('hidden',m!=='form');
+  document.getElementById('chatPanel').classList.toggle('hidden',m!=='chat');
+  document.getElementById('modeFormBtn').classList.toggle('active',m==='form');
+  document.getElementById('modeChatBtn').classList.toggle('active',m==='chat');
+}
+function setRideType(v){rideType=v==='ebike'?1:0;document.getElementById('btnBike').classList.toggle('on-orange',v==='bike');document.getElementById('btnEbike').classList.toggle('on-orange',v==='ebike');}
+function setRoad(v){roadPref=v;document.getElementById('btnDefault').classList.toggle('on-red',v===0);document.getElementById('btnSafe').classList.toggle('on-red',v===3);}
+function setStatus(type,text){const el=document.getElementById('topStatus');el.className='top-status '+(type||'');el.textContent=text;}
+function homeInputKeydown(e){if(e.key==='Enter'){e.preventDefault();submitHomeInput();}}
+function submitHomeInput(){const v=document.getElementById('chatHomeInput').value.trim();if(v)triggerChat(v);}
+function fillChatAndSend(text){triggerChat(text);}
+function fillChat(text){triggerChat(text);}
+async function triggerChat(text){
+  showChatConv();
+  let finalText = text;
+  // ✅ 自动定位：检测到附近/最近关键词时，先获取GPS再发送
+  // ✅ 人格自动识别
+  const autoP = autoDetectPersona(text);
+  if (autoP && autoP !== currentPersona) {
+    const btn = document.querySelector(`.persona-btn[onclick*="${autoP}"]`);
+    if (btn) setPersona(autoP, btn);
+  }
+  if (needsLocation(text)) {
+    setStatus('busy', '📍 获取位置中...');
+    const gps = await getGPS(6000);
+    if (gps) {
+      finalText = text + ` [我的当前位置坐标：纬度${gps.lat.toFixed(6)},经度${gps.lng.toFixed(6)}，请直接用此坐标查找附近米其林餐厅，无需再问我位置]`;
+    }
+    setStatus('', '就绪');
+  }
+  const ta=document.getElementById('chatInput');ta.value=finalText;autoResize(ta);
+  sendChat();
+}
+function showChatConv(){
+  document.getElementById('chatHome').style.display='none';
+  document.getElementById('chatMessages').style.display='flex';
+  document.getElementById('chatInputBar').style.display='flex';
+}
+function toggleMoreCards(){
+  moreCardsOpen=!moreCardsOpen;
+  document.querySelectorAll('.hidden-card').forEach(el=>el.classList.toggle('show',moreCardsOpen));
+  const btn=document.getElementById('featMoreBtn'),chip=document.getElementById('moreChipBtn');
+  if(btn)btn.textContent=moreCardsOpen?'收起 ↑':'展开更多 ↓';
+  if(chip)chip.querySelector('span').textContent=moreCardsOpen?'收起':'···';
+}
+function autoResize(ta){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';}
+function chatKeydown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}}
+
+/* ══ API 调用 ══ */
+async function fetchRoute(city,startAddr,destAddr,rt,rp){
+  const res=await fetch(`${BACKEND}/api/plan_route`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city,destination:destAddr,start_addr:startAddr,riding_type:rt,road_prefer:rp})});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);
+  return data;
+}
+async function fetchWeather(city){
+  const res=await fetch(`${BACKEND}/api/weather?city=${encodeURIComponent(city)}`);
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.message||`HTTP ${res.status}`);
+  return data;
+}
+async function fetchRouteMulti(city,start,dest){
+  const res=await fetch(`${BACKEND}/api/plan_route`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({city,destination:dest,start_addr:start||'',riding_type:rideType,road_prefer:roadPref})});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);
+  return data;
+}
+async function fetchPlaces(query,city){
+  try{const res=await fetch(`${BACKEND}/api/search_places?query=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`);if(!res.ok)return{places:[]};return await res.json();}
+  catch{return{places:[]};}
+}
+
+/* ══════════════════════════════════════════
+   【改动1】streamAI → 调后端 /api/chat
+   原来直接调 Anthropic API，现在转到后端
+══════════════════════════════════════════ */
+async function streamAI(routeData, lang, targetEl) {
+  const r = routeData.route;
+  const stepsText = (r.steps||[]).slice(0,12).map((s,i) =>
+    `${i+1}. ${s.name||'道路'} — ${(s.distance/1000).toFixed(2)}km, ${Math.round(s.duration/60)}min${s.turn_type?', '+s.turn_type:''}`
+  ).join('\n');
+  const prompt = lang === 'en'
+    ? `Cycling guide. Route: ${routeData.start.name} to ${routeData.destination.name}, ${r.distance_km}km, ${r.duration_min}min. Steps:\n${stepsText}\nBrief analysis: 1)Difficulty 2)Key segments 3)Tips 4)Best time. Max 200 words.`
+    : `你是专业骑行向导"马到橙功"。路线：${routeData.start.name} → ${routeData.destination.name}，${r.distance_km}km，${r.duration_min}分钟，${rideType===1?'电动自行车':'普通自行车'}，共${r.steps?.length||0}段。\n分段：\n${stepsText}\n\n分析：1)🧭 难度评估 2)⚠️ 注意路段 3)💡 骑行贴士 4)🌤️ 出行时段建议。不超过220字，语气专业友好，结尾加一句骑行鼓励语。`;
+
+  targetEl.innerHTML = '<span class="cursor-blink"></span>';
+  try {
+    const res = await fetch(`${BACKEND}/api/chat`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        message: prompt,
+        city: document.getElementById('city').value.trim() || '上海'
+      })
+    });
+    const data = await res.json();
+    if (data.reply) {
+      // 逐字打印效果
+      let i = 0;
+      targetEl.innerHTML = '';
+      const tick = () => {
+        if (i < data.reply.length) {
+          targetEl.innerHTML = data.reply.slice(0, ++i) + '<span class="cursor-blink"></span>';
+          requestAnimationFrame(tick);
+        } else {
+          targetEl.innerHTML = data.reply;
+        }
+      };
+      tick();
+    } else {
+      targetEl.innerHTML = data.error || 'AI 分析暂不可用';
+    }
+  } catch(e) {
+    targetEl.innerHTML = `<span style="color:var(--t3)">AI 分析暂不可用：${e.message}</span>`;
+  }
+}
+
+/* ══ 天气卡片 ══ */
+function weatherIcon(t){if(/雨/.test(t))return'🌧️';if(/雪/.test(t))return'❄️';if(/云|阴/.test(t))return'⛅';if(/晴/.test(t))return'☀️';if(/雾|霾/.test(t))return'🌫️';return'🌤️';}
+function renderWeatherCard(city,w){
+  const icon=weatherIcon(w.text);
+  const tip=w.text.includes('雨')?'检测到有雨，路面湿滑，建议骑行注意安全。':parseInt(w.temp)>35?'高温天气，携带充足饮水，避开正午骑行。':parseInt(w.temp)<5?'气温较低，做好保暖再出发！':'天气宜人，马到橙功出发！🍊';
+  return `<div class="weather-card"><div class="weather-main"><div class="weather-icon">${icon}</div><div><div style="font-size:12px;color:var(--t2);margin-bottom:4px">${city} · 实时天气</div><div class="weather-temp">${w.temp}<sup>℃</sup></div><div style="font-size:13px;color:var(--o2);margin-top:2px">${w.text}</div></div></div><div class="weather-info"><span>🌡️ 体感 ${w.feels_like}℃</span><span>💧 湿度 ${w.rh}%</span><span>🌬️ ${w.wind_dir}</span><span>💨 ${w.wind_class}</span></div><div class="weather-tip">🍊 骑行建议：${tip}</div></div>`;
+}
+
+/* ══ 表单模式 ══ */
+async function runForm(){
+  const city=document.getElementById('city').value.trim()||'上海';
+  const startAddr=document.getElementById('startAddr').value.trim();
+  const destAddr=document.getElementById('destAddr').value.trim();
+  const aiLang=document.getElementById('aiLang').value;
+  if(!destAddr){setStatus('err','请填写终点地址');return;}
+  document.getElementById('runBtn').disabled=true;
+  setStatus('busy','⏳ 规划中...'); setMascot('cycling');
+  let data;
+  try{data=await fetchRoute(city,startAddr,destAddr,rideType,roadPref);}
+  catch(e){setStatus('err','后端失败');setMascot('error');document.getElementById('resultPanel').innerHTML=`<div class="err-card"><strong>❌ 后端请求失败</strong><br>${e.message}<br><br>请确认已运行：<code>python app.py</code><br>DeepSeek Key：<code>export DEEPSEEK_API_KEY=sk-xxx</code></div>`;document.getElementById('runBtn').disabled=false;return;}
+  const r=data.route,calEst=Math.round(r.distance_km*35);
+  currentTransportMode='riding';
+  const mapUrl=getMapUrl(data.start.name,data.start.lat,data.start.lng,data.destination.name,data.destination.lat,data.destination.lng,'riding');
+  const stepsHTML=(r.steps||[]).map((s,i)=>`<li class="step-row"><div class="s-num">${i+1}</div><div class="s-body"><div class="s-name">${s.name||'继续前行'}</div><div class="s-meta"><span>${(s.distance/1000).toFixed(2)} km</span><span>${Math.round(s.duration/60)} min</span></div>${s.turn_type?`<span class="s-turn">${s.turn_type}</span>`:''}</div></li>`).join('');
+  document.getElementById('resultPanel').innerHTML=`
+    <div class="metrics">
+      <div class="m-card orange"><div class="m-icon">📏</div><div class="m-val">${r.distance_km}<span class="unit">km</span></div><div class="m-lbl">骑行距离</div></div>
+      <div class="m-card red"><div class="m-icon">⏱️</div><div class="m-val">${r.duration_min}<span class="unit">min</span></div><div class="m-lbl">预计耗时</div></div>
+      <div class="m-card"><div class="m-icon">🔥</div><div class="m-val" style="color:var(--gold)">≈${calEst}<span class="unit">kcal</span></div><div class="m-lbl">消耗热量</div></div>
+      <div class="m-card"><div class="m-icon">${rideType===1?'⚡':'🚲'}</div><div class="m-val" style="font-size:16px;letter-spacing:0;margin-top:6px">${r.steps?.length||0}<span class="unit">段</span></div><div class="m-lbl">路线分段</div></div>
+    </div>
+    <div class="route-bar"><div class="rb-dot orange"></div><span class="rb-name">${data.start.name}</span><div class="rb-line"></div><span class="rb-name">${data.destination.name}</span><div class="rb-dot red"></div><a class="map-link" href="${mapUrl}" target="_blank">${MAP_PROVIDERS[mapProvider].icon} ${MAP_PROVIDERS[mapProvider].label}查看 ↗</a></div>
+    <div class="steps-card"><div class="card-top"><h3>路线分段详情</h3><span class="badge o">${r.steps?.length||0} 段</span></div><ul class="step-list">${stepsHTML}</ul></div>
+    <div class="ai-card"><div class="ai-top"><span>🍊</span><span class="ai-label">AI 骑行分析</span><span class="ai-model">DeepSeek</span></div><div class="ai-body" id="aiFormBody"></div></div>`;
+  setStatus('',`✅ ${r.distance_km} km · ${r.duration_min} min`);
+  setMascot('success');
+  document.getElementById('runBtn').disabled=false;
+  await streamAI(data,aiLang,document.getElementById('aiFormBody'));
+  setTimeout(()=>setMascot('idle'),3000);
+}
+
+/* ══ 对话消息渲染 ══ */
+function addMsg(role,content,routeData){
+  const home=document.getElementById('chatHome');
+  if(home&&home.style.display!=='none')showChatConv();
+  const time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  const div=document.createElement('div');div.className=`msg ${role}`;
+  const avatar=role==='user'?'🙂':'🍊';
+  let extra='';
+  if(routeData){
+    const r=routeData.route;
+    const mapUrl=getMapUrl(routeData.start.name,routeData.start.lat,routeData.start.lng,routeData.destination.name,routeData.destination.lat,routeData.destination.lng,currentTransportMode);
+    const allMapBtns=Object.entries(MAP_PROVIDERS).map(([k,v])=>{
+      const u=getMapUrlForProvider(k,routeData.start.name,routeData.start.lat,routeData.start.lng,routeData.destination.name,routeData.destination.lat,routeData.destination.lng,currentTransportMode);
+      return `<a class="cr-map-btn${k===mapProvider?' cr-map-active':''}" href="${u}" target="_blank">${v.icon} ${v.label}</a>`;
+    }).join('');
+    const modeLabel=(TRANSPORT_MODE_MAP[currentTransportMode]||TRANSPORT_MODE_MAP.riding).label;
+    const steps=(r.steps||[]).slice(0,8);
+    extra=`<div class="chat-route"><div class="cr-head">🗺️ <strong>${routeData.start.name}</strong> → <strong>${routeData.destination.name}</strong></div><div class="cr-metrics"><div class="cr-metric"><div class="v">${r.distance_km}<span class="u">km</span></div><div class="l">距离</div></div><div class="cr-metric"><div class="v" style="color:var(--r1)">${r.duration_min}<span class="u">min</span></div><div class="l">耗时</div></div><div class="cr-metric"><div class="v" style="color:var(--gold)">≈${Math.round(r.distance_km*35)}<span class="u">kcal</span></div><div class="l">热量</div></div></div><div class="cr-steps">${steps.map((s,i)=>`<div class="cr-step"><span class="sn">${i+1}</span><span>${s.name||'前行'} — ${(s.distance/1000).toFixed(2)}km${s.turn_type?', '+s.turn_type:''}</span></div>`).join('')}${r.steps?.length>8?`<div class="cr-step" style="color:var(--t3)"><span class="sn">…</span><span>还有 ${r.steps.length-8} 段</span></div>`:''}</div><div class="cr-footer"><span style="font-size:11px;color:var(--t3)">${modeLabel}</span><div class="cr-map-btns">${allMapBtns}</div></div></div>`;
+    setTimeout(()=>window.open(mapUrl,'_blank'),400);
+  }
+  div.innerHTML=`<div class="msg-avatar">${avatar}</div><div class="msg-body">${content?`<div class="msg-text">${content}</div>`:''}${extra}<div class="msg-time">${time}</div></div>`;
+  document.getElementById('chatMessages').appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'end'});
+  return div;
+}
+function addTyping(){
+  const div=document.createElement('div');div.className='msg bot';div.id='typing';
+  div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body"><div class="msg-text" style="padding:0"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>`;
+  document.getElementById('chatMessages').appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'end'});
+  return div;
+}
+
+/* ══ 复杂查询检测 ══ */
+function isAgentQuery(text){
+  // ✅ 加入米其林/餐厅/美食关键词
+  const c=/帮我|推荐|去哪|哪里|行程|一日|周末|带娃|亲子|好玩|景点|怎么玩|玩什么|有什么好|附近|找个|安排|规划一下|出游|游玩|怎么安排|好吃|好喝|逛|游|旅|玩|哪家|米其林|餐厅|美食|restaurant|michelin|一星|二星|三星|摘星|在哪吃|哪里吃|好餐|推荐吃|酒店|宾馆|民宿|住宿|预算|门票|景区|旅游|打算|计划|出发|几天|攻略|住哪|吃什么|玩什么|怎么玩/i;
+  const t=text.trim();
+  if(/^[\S\s]{0,10}天气[\S\s]{0,6}$/.test(t))return false;
+  if(/^[\s\S]{2,12}(到|→|至|骑到|开到|走到)[\s\S]{2,12}$/.test(t)&&!c.test(t))return false;
+  return c.test(t);
+}
+
+/* 🍽️ 米其林助手 */
+async function askMichelin(){
+  const qi=document.getElementById('michelinQuestion');
+  const ad=document.getElementById('michelinAnswer');
+  const q=qi.value.trim();
+  if(!q){ad.style.display='block';ad.innerHTML='<span style="color:var(--r1)">请输入问题</span>';return;}
+  ad.style.display='block';
+  ad.innerHTML='<span class="astep-loading">思考中 ···</span>';
+  try{
+    const res=await fetch(`${BACKEND}/ask_michelin`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    const data=await res.json();
+    if(data.error){ad.innerHTML=`<span style="color:var(--r1)">❌ ${data.error}</span>`;}
+    else{
+      let ref=data.references?.length?`<div class="michelin-ref">📚 参考：${data.references.join(', ')}</div>`:'';
+      ad.innerHTML=`<p>${data.answer.replace(/\n/g,'<br>')}</p>${ref}`;
+    }
+  }catch(e){ad.innerHTML=`<span style="color:var(--r1)">⚠️ ${e.message}</span>`;}
+}
+
+/* ══════════════════════════════════════════
+   【改动2】sendChat 意图解析 → 调后端 /api/chat
+   原来直接调 Anthropic API，现在转到后端
+══════════════════════════════════════════ */
+async function sendChat(){
+  if(chatBusy)return;
+  const ta=document.getElementById('chatInput');
+  const input=ta.value.trim();if(!input)return;
+  const city=document.getElementById('city').value.trim()||'上海';
+  const aiLang=document.getElementById('aiLang').value;
+  ta.value='';autoResize(ta);
+  if(agentMode){
+    // ✅ agentMode：同样检测定位需求
+    let agentInput = input;
+    if (needsLocation(input)) {
+      setStatus('busy','📍 获取位置中...');
+      const gps = await getGPS(5000);
+      if (gps) {
+        agentInput = input + ` [我的当前位置坐标：纬度${gps.lat.toFixed(6)},经度${gps.lng.toFixed(6)}，请直接用此坐标查找附近米其林餐厅，无需再问我位置]`;
+      }
+      setStatus('','就绪');
+    }
+    addMsg('user', input);  // ✅ 显示原始消息（不显示坐标）
+    runAgent(agentInput, city); return;
+  }
+  addMsg('user',input);
+  setMascot(inferMascot(input));
+  chatBusy=true;
+  document.getElementById('chatSendBtn').disabled=true;
+  const resetStatus=()=>{chatBusy=false;document.getElementById('chatSendBtn').disabled=false;if(document.getElementById('topStatus').textContent.startsWith('⏳'))setStatus('','就绪');};
+  const typing=addTyping();
+  const localIntent=localDetectIntent(input);
+
+  /* 0. 复杂查询 → Agent */
+  // ✅ isAgentQuery：检测定位需求
+  if(isAgentQuery(input)){
+    typing.remove();
+    let agentInput2 = input;
+    if (needsLocation(input)) {
+      setStatus('busy','📍 获取位置中...');
+      const gps2 = await getGPS(5000);
+      if (gps2) {
+        agentInput2 = input + ` [我的当前位置坐标：纬度${gps2.lat.toFixed(6)},经度${gps2.lng.toFixed(6)}，请直接用此坐标查找附近米其林餐厅，无需再问我位置]`;
+      }
+      setStatus('','就绪');
+    }
+    await runAgent(agentInput2,city);resetStatus();return;
+  }
+
+  /* 1. 本地天气识别 */
+  if(localIntent?.intent==='weather'){
+    setStatus('busy','🌤️ 查询天气中...');setMascot('weather');
+    try{
+      const wData=await fetchWeather(localIntent.city);typing.remove();
+      const w=wData.data,time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+      const div=document.createElement('div');div.className='msg bot';
+      div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherCard(localIntent.city,w)}<div class="msg-time">${time}</div></div>`;
+      document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
+      setStatus('','✅ 天气查询成功');setMascot('success');setTimeout(()=>setMascot('idle'),2500);
+    }catch(e){typing.remove();addMsg('bot',`❌ 天气查询失败：${e.message}`);setMascot('error');}
+    resetStatus();return;
+  }
+
+  /* 2. 调后端 /api/chat 解析意图（原来直接调 Claude API）*/
+  setStatus('busy','⏳ 解析意图中...');
+  let parsed;
+  try{
+    const res=await fetch(`${BACKEND}/api/chat`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        city,
+        history: chatHistory.slice(-10),
+        message:`用户请求（当前城市：${city}）: "${input}"
+判断意图并返回纯JSON：
+- 天气查询：{"intent":"weather","city":"城市名"}
+- 骑行路线：{"intent":"route","start":"起点","dest":"终点","city":"城市"}
+- 其他闲聊：{"intent":"chat","reply":"简短回复"}
+只返回JSON，不含任何其他文字或markdown。`
+      })
+    });
+    const d=await res.json();
+    const txt=d.reply||'';
+    parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+  }catch(e){
+    console.warn('意图解析失败，本地兜底:',e.message);
+    const localRoute=localExtractRoute(input,city);
+    if(localRoute&&localRoute.dest){parsed={intent:'route',...localRoute};}
+    else if(localIntent?.intent==='route_maybe'){
+      // ✅ 路线意图不明确时也交给 Agent
+      typing.remove();
+      await runAgent(input, city);
+      resetStatus(); return;
+    }
+    else{
+      // ✅ 兜底：任何无法识别的输入都交给 Agent 处理，保证始终有结果
+      typing.remove();
+      await runAgent(input, city);
+      resetStatus(); return;
+    }
+  }
+
+  /* 分支：天气 */
+  if(parsed.intent==='weather'){
+    setStatus('busy','🌤️ 查询天气中...');setMascot('weather');
+    try{
+      const wData=await fetchWeather(parsed.city||city);typing.remove();
+      const w=wData.data,time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+      const div=document.createElement('div');div.className='msg bot';
+      div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherCard(parsed.city||city,w)}<div class="msg-time">${time}</div></div>`;
+      document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
+      setStatus('','✅ 天气查询成功');setMascot('success');setTimeout(()=>setMascot('idle'),2500);
+    }catch(e){typing.remove();addMsg('bot',`❌ 天气查询失败：${e.message}`);setMascot('error');}
+    resetStatus();return;
+  }
+
+  /* 分支：闲聊 */
+  if(parsed.intent==='chat'){typing.remove();addMsg('bot',parsed.reply||'🍊 马到橙功！有啥骑行计划就告诉我～');setMascot('idle');resetStatus();return;}
+
+  /* 分支：路线 */
+  if(!parsed.dest){typing.remove();addMsg('bot','没找到目的地 😅 例如"从人民广场骑到外滩"');setMascot('idle');resetStatus();return;}
+  currentTransportMode=detectTransportMode(input);
+  setStatus('busy',`⏳ 规划路线...`);setMascot('cycling');
+  let routeData;
+  try{routeData=await fetchRoute(parsed.city||city,parsed.start,parsed.dest,rideType,roadPref);}
+  catch(e){typing.remove();addMsg('bot',`❌ 路线规划失败：${e.message}`);setMascot('error');resetStatus();return;}
+  typing.remove();
+  addMsg('bot',null,routeData);
+  setStatus('',`✅ ${routeData.route.distance_km}km · ${routeData.route.duration_min}min`);
+  setMascot('success');setTimeout(()=>setMascot('idle'),3000);
+  const timeStr=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  const aiEl=document.createElement('div');aiEl.className='msg bot';
+  aiEl.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body"><div class="msg-text" id="chatAIText"></div><div class="msg-time">${timeStr}</div></div>`;
+  document.getElementById('chatMessages').appendChild(aiEl);
+  aiEl.scrollIntoView({behavior:'smooth',block:'end'});
+  await streamAI(routeData,aiLang,document.getElementById('chatAIText'));
+  aiEl.scrollIntoView({behavior:'smooth',block:'end'});
+  // ✅ 保存路线对话到历史
+  chatHistory.push({role:'user',content:input});
+  chatHistory.push({role:'assistant',content:`路线规划：${routeData.start.name} → ${routeData.destination.name}，${routeData.route.distance_km}km`});
+  if(chatHistory.length>50) chatHistory=chatHistory.slice(-50);
+  showHistoryPanel();
+  resetStatus();
+}
+
+/* ══ Agent UI 工具函数（保持不变） ══ */
+const TOOL_META={
+  get_weather:    {ico:'🌤️',label:'查询天气'},
+  plan_route:     {ico:'🗺️',label:'规划路线'},
+  search_places:  {ico:'🔍',label:'搜索地点'},
+  search_michelin:    {ico:'🍽️',label:'查询米其林'},
+  find_nearest_michelin:{ico:'📍',label:'附近米其林'},
+  call_meituan_skill:   {ico:'🛵',label:'美团搜索'},   // ✅ 美团工具
+};
+function toggleAgentMode(){
+  agentMode=!agentMode;
+  const btn=document.getElementById('agentToggleBtn'),ta=document.getElementById('chatInput');
+  btn.classList.toggle('agent-on',agentMode);
+  btn.title=agentMode?'关闭 DeepSeek Agent':'开启 DeepSeek Agent';
+  let lbl=btn.querySelector('.agent-on-label');
+  if(agentMode){if(!lbl){lbl=document.createElement('div');lbl.className='agent-on-label';btn.appendChild(lbl);}lbl.textContent='Agent ON';ta.placeholder='描述复杂需求，DeepSeek Agent 自动规划…';}
+  else{if(lbl)lbl.remove();ta.placeholder='继续提问，例如：今天天气适合骑行吗？';}
+}
+function createAgentCard(){
+  const id=++agentCounter;
+  const time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  const div=document.createElement('div');div.className='msg bot';div.id=`agentMsg_${id}`;
+  div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body"><div class="agent-card" id="agentCard_${id}"><div class="agent-hd"><div class="agent-hd-pulse anim" id="agentPulse_${id}"></div><span class="agent-hd-title">⚡ DeepSeek Agent 推理</span><span class="agent-hd-badge running" id="agentBadge_${id}">推理中…</span></div><div class="agent-steps-list" id="agentSteps_${id}"></div><div class="agent-final-wrap" id="agentFinalWrap_${id}" style="display:none"><div class="agent-final-hd">💡 综合结论</div><div class="agent-final-body" id="agentFinalBody_${id}"></div></div></div><div class="msg-time">${time}</div></div>`;
+  const home=document.getElementById('chatHome');
+  if(home&&home.style.display!=='none')showChatConv();
+  document.getElementById('chatMessages').appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'end'});
+  return id;
+}
+function addAgentStep(cardId,sid,toolName,toolInput){
+  const meta=TOOL_META[toolName]||{ico:'⚙️',label:toolName};
+  const chip=toolName==='get_weather'?toolInput.city:toolName==='plan_route'?`${toolInput.start||'当前位置'} → ${toolInput.destination}`:toolName==='search_places'?toolInput.query:toolName==='search_michelin'?toolInput.query:toolName==='find_nearest_michelin'?`附近${toolInput.limit||5}家`:toolName==='call_meituan_skill'?(toolInput.keyword||toolInput.city||toolInput.intent||'搜索'):'';
+  document.getElementById(`agentSteps_${cardId}`).insertAdjacentHTML('beforeend',`<div class="agent-step" id="astep_${sid}"><div class="astep-left"><div class="astep-dot running" id="adot_${sid}"></div><span class="astep-ico">${meta.ico}</span></div><div class="astep-body"><div class="astep-title">${meta.label} <span class="astep-chip">${chip}</span></div><div class="astep-result" id="ares_${sid}"><span class="astep-loading">···</span></div></div></div>`);
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView({behavior:'smooth',block:'end'});
+}
+function _markStep(sid,st){const d=document.getElementById(`adot_${sid}`);if(d)d.className='astep-dot '+st;}
+function updateStepWeather(sid,city,w){
+  _markStep(sid,'done');
+  const ic=weatherIcon(w.text);
+  const isR=w.text.includes('雨'),isH=parseInt(w.temp)>35,isC=parseInt(w.temp)<5;
+  const tc=(isR||isH||isC)?'warn':'ok',tt=isR?'⚠️ 注意防雨':isH?'⚠️ 高温防晒':isC?'⚠️ 注意保暖':'✅ 适合出行';
+  document.getElementById(`ares_${sid}`).innerHTML=`${ic} <strong>${city}</strong> ${w.text} · ${w.temp}℃ · ${w.wind_dir}${w.wind_class} · 湿度${w.rh}% <span class="atag ${tc}">${tt}</span>`;
+}
+function updateStepRoute(sid,rd,mode){
+  _markStep(sid,'done');
+  const mi={riding:'🚲',driving:'🚗',walking:'🚶',transit:'🚌'}[mode]||'🚲';
+  const url=getMapUrl(rd.start.name,rd.start.lat,rd.start.lng,rd.destination.name,rd.destination.lat,rd.destination.lng,mode||'riding');
+  document.getElementById(`ares_${sid}`).innerHTML=`${mi} <strong>${rd.start.name}</strong> → <strong>${rd.destination.name}</strong> <span class="ametrics">${rd.route.distance_km}km · ${rd.route.duration_min}min</span> <a class="amaplink" href="${url}" target="_blank">${MAP_PROVIDERS[mapProvider].icon} 导航↗</a>`;
+}
+function updateStepPlaces(sid,query,places){
+  _markStep(sid,'done');
+  if(!places||!places.length){document.getElementById(`ares_${sid}`).innerHTML=`<span style="color:var(--t3)">暂未找到相关地点</span>`;return;}
+  const top3=places.slice(0,3).map(p=>`<span class="aplace">${p.name}${p.rating?' ⭐'+p.rating:''}</span>`).join('');
+  document.getElementById(`ares_${sid}`).innerHTML=`<span class="atag info">找到 ${places.length} 个</span> ${top3}${places.length>3?`<span style="color:var(--t3)">等</span>`:''}`;
+}
+function updateStepError(sid,msg){_markStep(sid,'error');document.getElementById(`ares_${sid}`).innerHTML=`<span style="color:var(--r1)">❌ ${msg}</span>`;}
+function finishAgentCard(cardId,ok){
+  const b=document.getElementById(`agentBadge_${cardId}`),p=document.getElementById(`agentPulse_${cardId}`);
+  if(b){b.textContent=ok?'完成':'中断';b.className='agent-hd-badge '+(ok?'done':'error');}
+  if(p){p.classList.remove('anim');p.classList.toggle('done',ok);}
+}
+function showAgentFinal(cardId,text){
+  finishAgentCard(cardId,true);
+  const w=document.getElementById(`agentFinalWrap_${cardId}`),b=document.getElementById(`agentFinalBody_${cardId}`);
+  if(w&&b){w.style.display='block';b.textContent=text;}
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+/* ══════════════════════════════════════════
+   【改动3】runAgent → 调后端 /api/agent（SSE）
+   原来直接调 Anthropic Function Calling API
+   现在改为读取后端返回的 SSE 事件流
+══════════════════════════════════════════ */
+
+/* ✅ 查找附近米其林餐厅 */
+function findNearestMichelin() {
+  const ad = document.getElementById('nearestAnswer');
+  ad.style.display = 'block';
+  ad.innerHTML = '<span class="astep-loading">📍 定位中 ···</span>';
+  if (!navigator.geolocation) {
+    ad.innerHTML = '<span style="color:var(--r1)">⚠️ 浏览器不支持定位，请使用Chrome/Safari</span>';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    ad.innerHTML = '<span class="astep-loading">🍽️ 搜索中 ···</span>';
+    try {
+      const res = await fetch(`${BACKEND}/api/nearest_michelin`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({lat, lng, limit: 5})
+      });
+      const data = await res.json();
+      if (data.restaurants && data.restaurants.length) {
+        const html = data.restaurants.map((r,i) => `
+          <div style="padding:5px 0;border-bottom:1px solid var(--line)">
+            <div style="font-weight:600;font-size:12px">${i+1}. ${r.name} ${'★'.repeat(parseInt(r.star_rating)||1)}</div>
+            <div style="font-size:11px;color:var(--t2)">📍 ${r.distance_km}km · ${r.cuisine}</div>
+            <div style="font-size:10px;color:var(--t3)">${r.address}</div>
+          </div>`).join('');
+        ad.innerHTML = `<div style="font-size:11px;font-weight:600;margin-bottom:4px">📍 附近米其林餐厅（${lat.toFixed(4)},${lng.toFixed(4)}）</div>${html}`;
+      } else {
+        ad.innerHTML = `<span style="color:var(--r1)">❌ ${data.error || '附近未找到米其林餐厅'}</span>`;
+      }
+    } catch(e) {
+      ad.innerHTML = `<span style="color:var(--r1)">⚠️ ${e.message}</span>`;
+    }
+  }, (err) => {
+    ad.innerHTML = `<span style="color:var(--r1)">❌ 定位失败：${err.message}<br>请允许浏览器访问位置权限</span>`;
+  }, {timeout:8000, enableHighAccuracy:true});
+}
+
+/* ✅ 显示/更新历史记录面板 */
+function showHistoryPanel() {
+  const panel = document.getElementById('historyPanel');
+  const list  = document.getElementById('historyList');
+  if (!chatHistory.length) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+  const recent = chatHistory.slice(-10);
+  list.innerHTML = recent.map(h => {
+    const icon = h.role==='user' ? '🙂' : '🍊';
+    const text = h.content.length > 40 ? h.content.slice(0,40)+'…' : h.content;
+    return `<div style="display:flex;gap:4px;padding:2px 0">
+      <span style="flex-shrink:0">${icon}</span>
+      <span style="color:${h.role==='user'?'var(--t1)':'var(--t2)'}">${text}</span>
+    </div>`;
+  }).join('');
+}
+
+async function runAgent(input, city) {
+  showChatConv();
+  // ✅ 不在这里 addMsg，由调用方负责添加用户消息（避免重复）
+  chatBusy = true;
+  document.getElementById('chatSendBtn').disabled = true;
+  setMascot('thinking'); setStatus('busy', '⚡ DeepSeek Agent 推理中…');
+
+  const city_ = city || document.getElementById('city').value.trim() || '上海';
+  const cardId = createAgentCard();
+
+  const done = (ok) => {
+    chatBusy = false;
+    document.getElementById('chatSendBtn').disabled = false;
+    setMascot(ok ? 'success' : 'error');
+    setTimeout(() => setMascot('idle'), 3000);
+    setStatus('', ok ? '✅ Agent 完成' : '⚠️ Agent 中断');
+    if (!ok) finishAgentCard(cardId, false);
+  };
+
+  try {
+    const resp = await fetch(`${BACKEND}/api/agent`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: input, city: city_, history: chatHistory.slice(-20), persona: currentPersona})
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      document.getElementById(`agentSteps_${cardId}`).insertAdjacentHTML('beforeend',
+        `<div style="padding:10px 14px;font-size:12px;color:var(--r1)">❌ ${err.error || '后端错误 '+resp.status}</div>`);
+      done(false); return;
+    }
+
+    // 解析 SSE 流
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let stepIdx = 0;
+
+    while (true) {
+      const {done: streamDone, value} = await reader.read();
+      if (streamDone) break;
+      buf += dec.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop(); // 保留最后不完整行
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let evt;
+        try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (evt.type === 'step_start') {
+          // 后端发来工具调用开始
+          const sid = `${cardId}_${stepIdx++}`;
+          evt._sid = sid; // 存到 evt 供 step_done 使用（通过 id 匹配）
+          addAgentStep(cardId, sid, evt.tool, evt.input);
+          // 用 id→sid 建立映射
+          if (!window._agentSidMap) window._agentSidMap = {};
+          window._agentSidMap[`${cardId}_${evt.id}`] = sid;
+        }
+        else if (evt.type === 'step_done') {
+          const sid = window._agentSidMap?.[`${cardId}_${evt.id}`] || `${cardId}_${stepIdx-1}`;
+          const r = evt.result || {};
+          if (evt.tool === 'get_weather' && r.success && r.data) {
+            updateStepWeather(sid, r.city || '', r.data);
+          } else if (evt.tool === 'plan_route' && r.success) {
+            updateStepRoute(sid, r, r.mode || 'riding');
+          } else if (evt.tool === 'search_places') {
+            updateStepPlaces(sid, evt.input?.query || '', r.places || (Array.isArray(r) ? r : []));
+          } else if (evt.tool === 'call_meituan_skill') {
+            // ✅ 渲染美团搜索结果
+            if (r.success && r.results && r.results.length) {
+              _markStep(sid, 'done');
+              const src = r.source === 'baidu' ? '百度' : r.source === 'gaode' ? '高德' : '美团';
+              const items = r.results.slice(0,3).map(p => {
+                const rating = p.rating ? `⭐${p.rating}` : '';
+                const cost   = p.cost   ? `¥${p.cost}`   : '';
+                const dist   = p.distance ? `📍${p.distance}m` : '';
+                return `<span class="aplace">${p.name}${rating}${cost}${dist}</span>`;
+              }).join(' ');
+              document.getElementById(`ares_${sid}`).innerHTML =
+                `<span class="atag info">${src} ${r.count}家</span> ${items}`;
+            } else if (r.fallback) {
+              // 知识兜底：无API Key，DeepSeek用自身知识回答
+              _markStep(sid, 'done');
+              document.getElementById(`ares_${sid}`).innerHTML =
+                `<span class="atag warn">⚠️ 知识推荐</span> <span style="color:var(--t3);font-size:11px">实时数据未配置，AI将根据知识推荐</span>`;
+            } else {
+              updateStepError(sid, r.error || evt.summary || '搜索失败');
+            }
+          } else if (evt.tool === 'find_nearest_michelin') {
+            // ✅ 渲染最近米其林结果
+            if (r.success && r.restaurants && r.restaurants.length) {
+              _markStep(sid, 'done');
+              const rList = r.restaurants.slice(0,3).map(rt =>
+                `<span class="aplace">📍${rt.name}(${rt.distance_km}km·${rt.star_rating}★)</span>`
+              ).join(' ');
+              document.getElementById(`ares_${sid}`).innerHTML =
+                `<span class="atag ok">找到${r.restaurants.length}家</span> ${rList}`;
+            } else {
+              updateStepError(sid, r.error || '附近未找到米其林餐厅');
+            }
+          } else if (evt.tool === 'search_michelin') {
+            // ✅ 渲染米其林查询结果
+            if (r.success && r.answer) {
+              _markStep(sid, 'done');
+              const short = r.answer.length > 120 ? r.answer.slice(0,120)+'…' : r.answer;
+              document.getElementById(`ares_${sid}`).innerHTML =
+                `<span class="atag ok">🍽️ 已检索</span> <span style="color:var(--t1)">${short}</span>`;
+            } else {
+              updateStepError(sid, r.error || '米其林查询失败');
+            }
+          } else if (!r.success || r.error) {
+            updateStepError(sid, r.error || evt.summary || '调用失败');
+          } else {
+            _markStep(sid, 'done');
+            document.getElementById(`ares_${sid}`).textContent = evt.summary || '✅ 完成';
+          }
+        }
+        else if (evt.type === 'final') {
+          showAgentFinal(cardId, evt.text || '');
+          // ✅ 把本轮对话存入历史
+          chatHistory.push({role:'user', content:input});
+          if(evt.text) chatHistory.push({role:'assistant', content:evt.text});
+          if(chatHistory.length > 50) chatHistory = chatHistory.slice(-50);
+          showHistoryPanel();
+          done(true);
+        }
+        else if (evt.type === 'error') {
+          document.getElementById(`agentSteps_${cardId}`).insertAdjacentHTML('beforeend',
+            `<div style="padding:10px 14px;font-size:12px;color:var(--r1)">❌ ${evt.text}</div>`);
+          done(false);
+        }
+      }
+    }
+    // 流结束但没收到 final（超出步数等）
+    if (chatBusy) done(false);
+  } catch(e) {
+    document.getElementById(`agentSteps_${cardId}`).insertAdjacentHTML('beforeend',
+      `<div style="padding:10px 14px;font-size:12px;color:var(--r1)">⚠️ 连接失败：${e.message}<br>请确认后端已启动 python app.py</div>`);
+    done(false);
+  }
+}
+</script>
+</body>
+</html>
