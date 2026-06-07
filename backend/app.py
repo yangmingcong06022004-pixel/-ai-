@@ -76,7 +76,7 @@ except Exception as e:
 app = Flask(__name__)
 CORS(app)
 
-BAIDU_AK          = "8tskCa9dm3m8i1DQvtPRW9AxSfB1cZKY"
+BAIDU_AK          = os.environ.get("BAIDU_SERVER_AK", os.environ.get("BAIDU_MAP_AK", "8tskCa9dm3m8i1DQvtPRW9AxSfB1cZKY"))
 BAIDU_RIDING_URL  = "https://api.map.baidu.com/directionlite/v1/riding"
 BAIDU_WALKING_URL = "https://api.map.baidu.com/directionlite/v1/walking"
 BAIDU_GEOCODE_URL = "https://api.map.baidu.com/geocoding/v3/"
@@ -97,6 +97,8 @@ AMAP_JSAPI_KEY = os.environ.get("AMAP_JSAPI_KEY", os.environ.get("GAODE_JSAPI_KE
 AMAP_SECURITY_JS_CODE = os.environ.get("AMAP_SECURITY_JS_CODE", os.environ.get("GAODE_SECURITY_JS_CODE", ""))
 AMAP_MCP_KEY = os.environ.get("AMAP_MCP_KEY", os.environ.get("GAODE_MCP_KEY", ""))
 AMAP_SERVICE_HOST = os.environ.get("AMAP_SERVICE_HOST", "")
+BAIDU_BROWSER_AK = os.environ.get("BAIDU_BROWSER_AK", "")
+EXPOSE_MAP_JS_KEYS = os.environ.get("EXPOSE_MAP_JS_KEYS", "1").strip().lower() not in ("0", "false", "no")
 AMAP_WEBSERVICE_KEY = (
     os.environ.get("AMAP_WEBSERVICE_KEY")
     or os.environ.get("GAODE_KEY")
@@ -12603,18 +12605,24 @@ def api_nearest_michelin():
 def api_map_runtime_config():
     remote = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
     local_request = remote in ("127.0.0.1", "::1", "localhost")
+    expose_js_keys = local_request or EXPOSE_MAP_JS_KEYS
     return jsonify({
         "success": True,
         "provider_priority": ["gaode", "baidu", "google"],
         "amap": {
-            "jsapi_available": bool(AMAP_JSAPI_KEY) and local_request,
-            "jsapi_key": AMAP_JSAPI_KEY if local_request else "",
-            "security_js_code": AMAP_SECURITY_JS_CODE if local_request else "",
-            "service_host": AMAP_SERVICE_HOST if local_request else "",
+            "jsapi_available": bool(AMAP_JSAPI_KEY) and expose_js_keys,
+            "jsapi_key": AMAP_JSAPI_KEY if expose_js_keys else "",
+            "security_js_code": AMAP_SECURITY_JS_CODE if expose_js_keys else "",
+            "service_host": AMAP_SERVICE_HOST if expose_js_keys else "",
             "webservice_available": bool(AMAP_WEBSERVICE_KEY),
             "webservice_last_error": AMAP_LAST_ERROR.get("message", ""),
             "mcp_available": bool(AMAP_MCP_KEY),
             "jsapi_skill_available": os.path.exists(os.path.join(os.path.dirname(BASE_DIR), "amap-jsapi-skill", "SKILL.md")),
+        },
+        "baidu": {
+            "browser_available": bool(BAIDU_BROWSER_AK) and expose_js_keys,
+            "browser_ak": BAIDU_BROWSER_AK if expose_js_keys else "",
+            "server_available": bool(BAIDU_AK),
         },
         "fallbacks": ["baidu", "google"],
     })

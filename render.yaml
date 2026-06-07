@@ -29,3 +29,9 @@ services:
         sync: false
       - key: AMAP_MCP_KEY
         sync: false
+      - key: BAIDU_BROWSER_AK
+        sync: false
+      - key: BAIDU_SERVER_AK
+        sync: false
+      - key: EXPOSE_MAP_JS_KEYS
+        value: "1"

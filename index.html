@@ -1121,7 +1121,7 @@ const BACKEND = (() => {
   if (localHost || location.protocol === 'file:') return 'http://127.0.0.1:5000';
   return 'https://madochenggong-backend.onrender.com';
 })();
-const BAIDU_BROWSER_AK = 'Q0NvMJBcaAzRw6SShYsfl6VNtkeWXKcY';
+const BAIDU_BROWSER_AK = 'BEVUNOBOcukDfrvMl3ZUFaDcugvBy8mz';
 const CHAT_HISTORY_KEY = 'madochenggong_chat_history_v1';
 const CHAT_SESSION_KEY = 'madochenggong_session_id_v1';
 const USER_ID_KEY = 'madochenggong_user_id_v1';
@@ -4220,12 +4220,19 @@ function ensureBaiduMap() {
       try { delete window[cb]; } catch {}
     };
     const script = document.createElement('script');
-    script.src = `https://api.map.baidu.com/api?v=1.0&type=webgl&ak=${BAIDU_BROWSER_AK}&callback=${cb}`;
+    getMapRuntimeConfig().then(cfg => {
+      const ak = cfg?.baidu?.browser_ak || BAIDU_BROWSER_AK;
+      script.src = `https://api.map.baidu.com/api?v=1.0&type=webgl&ak=${encodeURIComponent(ak)}&callback=${cb}`;
+      document.head.appendChild(script);
+    }).catch(() => {
+      script.src = `https://api.map.baidu.com/api?v=1.0&type=webgl&ak=${encodeURIComponent(BAIDU_BROWSER_AK)}&callback=${cb}`;
+      document.head.appendChild(script);
+    });
     script.onerror = () => {
       clearTimeout(timer);
+      window._baiduMapPromise = null;
       reject(new Error('地图加载失败'));
     };
-    document.head.appendChild(script);
   });
   return window._baiduMapPromise;
 }
