@@ -158,7 +158,7 @@
     .demo-btn{padding:6px 13px;border-radius:18px;border:1px solid rgba(255,107,0,.4);background:linear-gradient(135deg,rgba(255,150,0,.1),rgba(212,0,31,.05));color:var(--o1);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
     .demo-btn:hover{background:rgba(255,107,0,.16);transform:translateY(-1px)}
     .chat-searchbar-wrap{position:relative}
-    .planner-control-row{display:grid;grid-template-columns:152px 132px 158px 132px;gap:12px;align-items:center;margin-top:2px;max-width:690px}
+    .planner-control-row{display:grid;grid-template-columns:152px 132px 158px;gap:12px;align-items:center;margin-top:2px;max-width:520px}
     .planner-pill{height:50px;border:1.5px solid var(--line2);background:var(--bg1);border-radius:14px;padding:0 11px;display:flex;align-items:center;gap:7px;color:var(--t2);font-size:12px;font-weight:700;box-shadow:0 2px 12px rgba(200,80,0,0.05)}
     .planner-pill-label{font-size:10px;color:var(--t3);font-family:var(--mono);white-space:nowrap}
     .planner-pill input,.planner-pill select{border:none;background:transparent;color:var(--t1);font-size:12px;font-weight:800;outline:none;width:100%;min-width:0}
@@ -169,7 +169,11 @@
     .planner-date-custom{display:none!important}
     .planner-pill.custom-date select{display:none}
     .planner-pill.custom-date .planner-date-custom{display:block!important}
-    .planner-action{height:50px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--o1),var(--o3));color:white;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 6px 18px rgba(255,138,0,.25)}
+    .planner-action{height:52px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--o1),var(--o3));color:white;font-size:13px;font-weight:900;cursor:pointer;box-shadow:0 6px 18px rgba(255,138,0,.25);white-space:nowrap}
+    .home-compose-row{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:12px;align-items:center;max-width:760px}
+    .home-compose-input{width:100%;height:52px;background:var(--bg1);border:1.5px solid var(--line2);border-radius:14px;color:var(--t1);font-family:var(--sans);font-size:14px;padding:0 16px;outline:none;box-shadow:0 2px 12px rgba(200,80,0,0.07)}
+    .home-compose-input::placeholder{color:var(--t3)}
+    .home-compose-input:focus{border-color:rgba(232,92,0,0.55);box-shadow:0 0 0 4px rgba(232,92,0,0.07),0 4px 16px rgba(200,80,0,0.1);background:var(--bg1)}
     .home-task-summary{display:none;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);background:var(--bg1);border-radius:14px;padding:12px 16px;box-shadow:0 2px 12px rgba(200,80,0,.06)}
     .home-task-summary-title{font-size:12px;color:var(--t3);font-family:var(--mono);font-weight:800}
     .home-task-summary-value{font-size:14px;color:var(--t1);font-weight:900;line-height:1.5}
@@ -179,7 +183,7 @@
     .chat-home.task-started .chat-home-main > :not(.home-task-summary){display:none}
     .chat-home.task-started .home-task-summary{display:flex}
     .chat-home.task-started .chat-home-sidebar{display:none}
-    .planner-overview{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .planner-overview{display:none;grid-template-columns:repeat(3,1fr);gap:10px}
     .planner-stat{background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 2px 10px rgba(200,80,0,.05)}
     .planner-stat-label{font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:6px}
     .planner-stat-val{font-size:15px;color:var(--t1);font-weight:900}
@@ -861,6 +865,7 @@
     .chat-hero-sub{font-size:12px;line-height:1.7}
     .planner-control-row{grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:none}
     .planner-action{grid-column:1/-1;width:100%;box-shadow:none}
+    .home-compose-row{grid-template-columns:1fr;width:100%;max-width:none}
     .planner-pill{height:48px;border-radius:12px;box-shadow:none}
     .planner-overview{grid-template-columns:1fr;gap:10px}
     .demo-row{gap:7px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
@@ -1004,7 +1009,6 @@
           <div class="chat-hero-tags">本地生活资源 · 地图路线引擎 · 智能规划 · Mock 执行闭环</div>
         </div>
         <div class="planner-control-row">
-          <input id="chatHomeInput" type="hidden">
           <label class="planner-pill" id="homeDateWrap">📅
             <span class="planner-pill-label">出行日期</span>
             <input id="homeTravelDate" type="hidden">
@@ -1039,6 +1043,9 @@
             </select>
             <input class="planner-budget-custom" id="homeBudgetCustom" type="number" min="1" step="50" placeholder="预算" oninput="syncHomeBudgetOverview()">
           </label>
+        </div>
+        <div class="home-compose-row">
+          <input class="home-compose-input" id="chatHomeInput" type="text" placeholder="一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队" onkeydown="homeInputKeydown(event)">
           <button class="planner-action" onclick="submitHomeInput()">生成行程</button>
         </div>
         <div class="demo-row">
@@ -1071,9 +1078,9 @@
             <div class="feat-card" onclick="fillChatAndSend('帮我规划一条串联3-5个地点的出游路线并生成地图')"><div class="feat-icon blue">🗺️</div><div class="feat-name">路线地图卡生成</div><div class="feat-desc">自动串联 3-5 个地点，生成可执行路线地图卡</div></div>
             <div class="feat-card" onclick="fillChatAndSend('帮我打车去最近的热门景点')"><div class="feat-icon red">🚕</div><div class="feat-name">Mock打车/下单</div><div class="feat-desc">生成待确认打车、酒店、门票、高铁和餐厅取号订单</div></div>
             <div class="feat-card" onclick="fillChatAndSend('热门餐厅排队太久怎么办，帮我盯排队并准备备选餐厅')"><div class="feat-icon gold">⏱️</div><div class="feat-name">排队与时间兜底</div><div class="feat-desc">排队过久自动切换备选餐厅或调整路线</div></div>
-            <div class="feat-card hidden-card" onclick="fillChatAndSend('我想要出片+美食的松弛感出游风格')"><div class="feat-icon purple">👥</div><div class="feat-name">出游人格模式</div><div class="feat-desc">家庭、情侣、特种兵、松弛感、穷游、出片党、美食脑袋</div></div>
+            <div class="feat-card" onclick="fillChatAndSend('我想要出片+美食的松弛感出游风格')"><div class="feat-icon purple">👥</div><div class="feat-name">出游人格模式</div><div class="feat-desc">家庭、情侣、特种兵、松弛感、穷游、出片党、美食脑袋</div></div>
             <div class="feat-card" onclick="fillChatAndSend('帮我规划出游路线，并给出松弛感、特种兵、美食脑袋三种方案对比')"><div class="feat-icon purple">🔀</div><div class="feat-name">多方案对比</div><div class="feat-desc">松弛感、特种兵、美食脑袋三种方案一键对比</div></div>
-            <div class="feat-card" onclick="queryPremiumDiningRag('帮我查询黑珍珠和米其林高端餐饮推荐')"><div class="feat-icon gold">💎</div><div class="feat-name">高端餐饮·黑珍珠/米其林</div><div class="feat-desc">结合黑珍珠/米其林榜单餐厅资料，补充高品质餐饮参考</div></div>
+            <div class="feat-card hidden-card" onclick="queryPremiumDiningRag('帮我查询黑珍珠和米其林高端餐饮推荐')"><div class="feat-icon gold">💎</div><div class="feat-name">高端餐饮·黑珍珠/米其林</div><div class="feat-desc">结合黑珍珠/米其林榜单餐厅资料，补充高品质餐饮参考</div></div>
             <div class="feat-card hidden-card" onclick="fillChatAndSend('查询当前位置实时天气')"><div class="feat-icon blue">🌤️</div><div class="feat-name">实时天气查询</div><div class="feat-desc">出发前查当前位置或任意城市实时天气</div></div>
             <div class="feat-card hidden-card" onclick="fillChatAndSend('找离我最近的厕所')"><div class="feat-icon orange">🚻</div><div class="feat-name">找最近厕所</div><div class="feat-desc">按当前位置搜索附近公厕</div></div>
             <div class="feat-card hidden-card" onclick="showRouteIntensity()"><div class="feat-icon gold">🧭</div><div class="feat-name">路线强度评估</div><div class="feat-desc">根据步行、天气和人群判断这条路线是否适合执行</div></div>
@@ -1129,7 +1136,7 @@
     </div>
 
     <div class="chat-conv-area" id="chatMessages" style="display:none"></div>
-    <div class="chat-input-bar" id="chatInputBar" style="display:flex">
+    <div class="chat-input-bar" id="chatInputBar" style="display:none">
       <button class="agent-toggle-btn" id="agentToggleBtn" onclick="toggleAgentMode()" title="开启智能 Agent 多步推理">⚡</button>
       <div class="chat-textarea-wrap">
         <textarea class="chat-textarea" id="chatInput" rows="1" placeholder="一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队" onkeydown="chatKeydown(event)" oninput="autoResize(this)"></textarea>
@@ -2581,8 +2588,9 @@ function isHomeTaskStarted() {
   return document.getElementById('chatHome')?.classList.contains('task-started');
 }
 function submitHomeInput(){
-  const v=(document.getElementById('chatInput')?.value || document.getElementById('chatHomeInput')?.value || '').trim();
-  if(!v){document.getElementById('chatInput')?.focus();return;}
+  const source = isHomeTaskStarted() ? document.getElementById('chatInput') : document.getElementById('chatHomeInput');
+  const v=(source?.value || '').trim();
+  if(!v){source?.focus();return;}
   lastHomeTaskInput = v;
   applyHomeControlsFromText(v);
   triggerChat(v);
