@@ -1036,6 +1036,11 @@ WMO_ZH = {0:"晴",1:"晴间多云",2:"多云",3:"阴",45:"雾",48:"浓雾",
     51:"小毛毛雨",53:"毛毛雨",55:"大毛毛雨",61:"小雨",63:"中雨",65:"大雨",
     71:"小雪",73:"中雪",75:"大雪",77:"冰粒",80:"阵雨",81:"中阵雨",82:"强阵雨",
     85:"小阵雪",86:"大阵雪",95:"雷暴",96:"雷暴冰雹",99:"强雷暴冰雹"}
+WEATHER_CACHE = {}
+WEATHER_CACHE_LOCK = threading.Lock()
+WEATHER_CACHE_TTL_SECONDS = int(os.environ.get("WEATHER_CACHE_TTL_SECONDS", "900"))
+WEATHER_CACHE_STALE_SECONDS = int(os.environ.get("WEATHER_CACHE_STALE_SECONDS", "21600"))
+WEATHER_FRIENDLY_FALLBACK = "天气服务暂时繁忙，路线已继续生成；建议出发前二次确认天气。"
 
 def _deg_to_dir(deg):
     return ["北","东北","东","东南","南","西南","西","西北"][round(float(deg)/45)%8]+"风"
@@ -1062,6 +1067,45 @@ def _safe_error_text(err) -> str:
     s = re.sub(r"((?:AK|KEY|TOKEN|SECRET|API_KEY)\s*[=:]\s*)[^\s,;]+", r"\1***", s, flags=re.I)
     s = re.sub(r"(Bearer\s+)[A-Za-z0-9._-]+", r"\1***", s, flags=re.I)
     return s
+
+def _weather_cache_key(loc: dict) -> str:
+    try:
+        return f"coord:{round(float(loc.get('lat')), 3)}:{round(float(loc.get('lng')), 3)}"
+    except Exception:
+        return "city:" + _city_alias(str(loc.get("name") or "当前位置")).lower()
+
+def _weather_cached(key: str, max_age: int) -> Optional[dict]:
+    now = time.time()
+    with WEATHER_CACHE_LOCK:
+        item = WEATHER_CACHE.get(key)
+    if not item or now - item.get("ts", 0) > max_age:
+        return None
+    data = json.loads(json.dumps(item.get("data") or {}, ensure_ascii=False))
+    if now - item.get("ts", 0) > WEATHER_CACHE_TTL_SECONDS:
+        data["cached"] = True
+        data["stale"] = True
+        data["message"] = "天气服务暂时繁忙，已显示最近一次可用天气。"
+    else:
+        data["cached"] = True
+    return data
+
+def _weather_store(key: str, data: dict) -> None:
+    with WEATHER_CACHE_LOCK:
+        WEATHER_CACHE[key] = {"ts": time.time(), "data": data}
+
+def _weather_fallback_result(loc: dict, err=None) -> dict:
+    key = _weather_cache_key(loc)
+    cached = _weather_cached(key, WEATHER_CACHE_STALE_SECONDS)
+    if cached:
+        return cached
+    print(f"[WEATHER_FALLBACK] {_safe_error_text(err)}")
+    return {
+        "success": False,
+        "friendly": True,
+        "city": loc.get("name") or "当前位置",
+        "error": WEATHER_FRIENDLY_FALLBACK,
+        "message": WEATHER_FRIENDLY_FALLBACK,
+    }
 
 def _read_text_file(path: str, default: str = "") -> str:
     try:
@@ -7464,8 +7508,12 @@ def tool_plan_weekend_trip(city: str, user_prompt: str,
 
 # ══ 核心工具 ══
 def _weather_from_loc(loc: dict) -> dict:
+    cache_key = _weather_cache_key(loc)
+    cached = _weather_cached(cache_key, WEATHER_CACHE_TTL_SECONDS)
+    if cached:
+        return cached
     try:
-        r=requests.get(OM_WEATHER_URL,params={
+        r=_HTTP_SESSION.get(OM_WEATHER_URL,params={
             "latitude":loc["lat"],"longitude":loc["lng"],
             "current":"temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m",
             "timezone":"auto","forecast_days":1},timeout=REQUEST_TIMEOUT)
@@ -7478,12 +7526,14 @@ def _weather_from_loc(loc: dict) -> dict:
         cd=loc.get("name") or "当前位置"
         if loc.get("country") and loc["country"] not in ("中国",):
             cd=f"{cd}({loc['country']})"
-        return {"success":True,"city":cd,"data":{
+        result = {"success":True,"city":cd,"data":{
             "text":WMO_ZH.get(wcode,"未知"),"temp":temp,"feels_like":feels,
             "wind_dir":_deg_to_dir(curr.get("wind_direction_10m",0)),
             "wind_class":_kmh_to_level(curr.get("wind_speed_10m",0)),"rh":rh}}
+        _weather_store(cache_key, result)
+        return result
     except Exception as e:
-        return {"success":False,"error":_safe_error_text(e)}
+        return _weather_fallback_result(loc, e)
 
 
 def tool_get_weather_by_coords(lat: float, lng: float, name: str = "当前位置") -> dict:
@@ -10931,14 +10981,16 @@ def _weather_city_from_message(text: str, city_hint: str) -> str:
 
 def _weather_final_text(result: dict) -> str:
     if not result.get("success"):
-        return f"天气查询失败：{result.get('error', '暂不可用')}"
+        return result.get("message") or result.get("error") or WEATHER_FRIENDLY_FALLBACK
     data = result.get("data") or {}
     city = result.get("city") or "当前位置"
+    cache_note = "\n天气服务刚才较忙，已使用最近一次可用天气。" if result.get("stale") else ""
     return _clean_markdown(
         f"{city} · 实时天气\n"
         f"{data.get('text', '未知')}，{data.get('temp', '-')}℃，体感 {data.get('feels_like', '-')}℃。\n"
         f"湿度 {data.get('rh', '-')}%，{data.get('wind_dir', '')} {data.get('wind_class', '')}。\n"
         "天气只作为出行辅助：有雨优先室内/少骑行，高温注意补水，正常天气可按原路线出发。"
+        f"{cache_note}"
     )
 
 
@@ -11356,8 +11408,16 @@ def api_weather():
         r = tool_get_weather_by_coords(lat, lng, request.args.get("city", "当前位置").strip() or "当前位置")
     else:
         r = tool_get_weather(request.args.get("city","上海").strip())
-    if r.get("success"): return jsonify({"status":"success","city":r["city"],"data":r["data"]})
-    return jsonify({"status":"error","message":r.get("error")}), 404
+    if r.get("success"):
+        return jsonify({
+            "status": "success",
+            "city": r["city"],
+            "data": r["data"],
+            "cached": bool(r.get("cached")),
+            "stale": bool(r.get("stale")),
+            "message": r.get("message", ""),
+        })
+    return jsonify({"status":"warning","message":r.get("message") or WEATHER_FRIENDLY_FALLBACK}), 200
 
 
 @app.route("/api/plan_route", methods=["POST"])

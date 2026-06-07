@@ -748,6 +748,56 @@
     .planner-control-row,.planner-overview,.wp-activities,.wp-risk-row,.wp-stop-list,.wp-status-flow,.pt-status-flow,.pt-leg-grid,.pt-rule-row,.mt-status-flow,.mt-overview-grid,.mt-budget-grid,.mt-hotel-grid,.mt-day-grid,.mt-dashboard-grid,.pending-order-items{grid-template-columns:1fr}
     .wp-map{min-height:240px}
   }
+  @media (max-width:760px){
+    html,body{overflow:hidden}
+    .topbar{height:52px;padding:0 12px;gap:8px}
+    .top-logo{width:32px;height:32px;font-size:28px}
+    .top-name{font-size:18px;letter-spacing:1px;white-space:nowrap}
+    .top-tag{display:none}
+    .workspace,.workspace.insight-collapsed{display:block;overflow:hidden}
+    .sidebar,.insight-panel{display:none!important}
+    .chat-panel{height:calc(100vh - 52px);min-width:0}
+    .chat-home{overflow:auto}
+    .chat-home-main{padding:20px 14px 18px;max-width:none;gap:14px}
+    .chat-hero-title{font-size:24px;letter-spacing:2px}
+    .chat-hero-sub{font-size:12px}
+    .planner-control-row{grid-template-columns:1fr 1fr;gap:8px;max-width:none}
+    .planner-action{grid-column:1 / -1}
+    .planner-pill{height:46px;padding:0 10px}
+    .demo-row{gap:6px}
+    .demo-btn{font-size:11px;padding:6px 10px}
+    .planner-overview,.feature-grid{grid-template-columns:1fr!important;gap:9px}
+    .feat-card,.planner-stat{padding:12px}
+    .chat-home.task-started .chat-home-main{padding:10px 12px}
+    .home-task-summary{padding:10px 12px;align-items:flex-start}
+    .home-task-summary-note{display:none}
+    .chat-conv-area{padding:12px 10px 10px;gap:12px}
+    .msg{max-width:100%}
+    .msg.user{margin-left:34px}
+    .msg.bot{margin-right:0}
+    .msg-avatar{width:28px;height:28px;font-size:15px}
+    .msg-body,.msg.wide-agent .msg-body{max-width:calc(100% - 32px);width:calc(100% - 32px)}
+    .msg-text,.agent-final-body{font-size:13px;line-height:1.75}
+    .agent-card{min-width:0;width:100%;max-width:100%;border-radius:12px}
+    .agent-step{padding:8px 10px;gap:8px}
+    .agent-hd{padding:9px 10px}
+    .agent-hd-title{font-size:11px}
+    .agent-timer{font-size:11px!important}
+    .weather-card,.meituan-trip-card,.weekend-plan-card,.mock-flight-card,.patch-card,.price-sim-card{border-radius:12px}
+    .weather-card{padding:12px}
+    .weather-main{gap:10px}
+    .weather-icon{font-size:34px}
+    .weather-temp{font-size:42px}
+    .weather-info{grid-template-columns:1fr 1fr}
+    .mt-card,.mt-mini,.route-map-card,.map-first-card{max-width:100%;overflow:hidden}
+    .mt-dashboard-grid,.mt-overview-grid,.mt-budget-grid,.mt-hotel-grid,.mt-day-grid,.pending-order-items,.patch-diff{grid-template-columns:1fr!important}
+    .patch-arrow{transform:rotate(90deg)}
+    .mf-actions,.action-row,.pending-order-actions{gap:6px}
+    .chat-input-bar{padding:8px 8px calc(8px + env(safe-area-inset-bottom));gap:7px;align-items:flex-end}
+    .agent-toggle-btn,.voice-btn,.chat-send{width:38px;height:38px;border-radius:11px;flex:0 0 38px}
+    .chat-textarea{font-size:13px;border-radius:12px;padding:9px 11px;max-height:96px}
+    .voice-status{display:none!important}
+  }
   /* ── 局部方案更新 diff 卡片 ── */
   .patch-card{border:1px solid rgba(15,118,110,.22);border-radius:14px;background:linear-gradient(135deg,#f0fdf8,#fffdf5);padding:12px 14px;box-shadow:0 6px 20px rgba(15,118,110,.08)}
   .patch-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -2555,14 +2605,14 @@ async function fetchRoute(city,startAddr,destAddr,rt,rp,profile=currentRouteProf
 async function fetchWeather(city){
   const res=await fetch(`${BACKEND}/api/weather?city=${encodeURIComponent(city)}`);
   const data=await res.json();
-  if(!res.ok)throw new Error(data.message||`HTTP ${res.status}`);
+  if(!res.ok || !data.data)throw new Error(data.message||'天气服务暂时繁忙，路线已继续生成；建议出发前二次确认天气。');
   return data;
 }
 async function fetchWeatherByLocation(lat,lng,label='当前位置'){
   const qs = new URLSearchParams({lat:String(lat), lng:String(lng), city:label});
   const res=await fetch(`${BACKEND}/api/weather?${qs.toString()}`);
   const data=await res.json();
-  if(!res.ok)throw new Error(data.message||`HTTP ${res.status}`);
+  if(!res.ok || !data.data)throw new Error(data.message||'天气服务暂时繁忙，路线已继续生成；建议出发前二次确认天气。');
   return data;
 }
 async function fetchWeatherForIntent(intent, fallbackCity){
@@ -2642,6 +2692,18 @@ function renderWeatherCard(city,w){
   const icon=weatherIcon(w.text);
   const tip=w.text.includes('雨')?'检测到有雨，路面湿滑，建议骑行注意安全。':parseInt(w.temp)>35?'高温天气，携带充足饮水，避开正午骑行。':parseInt(w.temp)<5?'气温较低，做好保暖再出发！':'天气宜人，马到橙功出发！🍊';
   return `<div class="weather-card"><div class="weather-main"><div class="weather-icon">${icon}</div><div><div style="font-size:12px;color:var(--t2);margin-bottom:4px">${city} · 实时天气</div><div class="weather-temp">${w.temp}<sup>℃</sup></div><div style="font-size:13px;color:var(--o2);margin-top:2px">${w.text}</div></div></div><div class="weather-info"><span>🌡️ 体感 ${w.feels_like}℃</span><span>💧 湿度 ${w.rh}%</span><span>🌬️ ${w.wind_dir}</span><span>💨 ${w.wind_class}</span></div><div class="weather-tip">🍊 骑行建议：${tip}</div></div>`;
+}
+function renderWeatherFallbackCard(message){
+  const text = message || '天气服务暂时繁忙，路线已继续生成；建议出发前二次确认天气。';
+  return `<div class="weather-card"><div class="weather-main"><div class="weather-icon">🌤️</div><div><div style="font-size:12px;color:var(--t2);margin-bottom:4px">天气提醒</div><div style="font-size:15px;font-weight:900;color:var(--o2);line-height:1.6">${escapeHTML(text)}</div></div></div><div class="weather-tip">🍊 不影响路线、餐饮和下单演示；出发前再确认一次天气即可。</div></div>`;
+}
+function appendWeatherFallback(message, typing){
+  if (typing) typing.remove();
+  const time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+  const div=document.createElement('div');div.className='msg bot';
+  div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherFallbackCard(message)}<div class="msg-time">${time}</div></div>`;
+  document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
+  setStatus('','天气服务暂时繁忙，已启用兜底');setMascot('idle');
 }
 
 /* ══ 表单模式 ══ */
@@ -3001,7 +3063,7 @@ async function sendChat(){
       div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherCard(weatherResult.label,w)}<div class="msg-time">${time}</div></div>`;
       document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
       setStatus('','✅ 天气查询成功');setMascot('success');setTimeout(()=>setMascot('idle'),2500);
-    }catch(e){typing.remove();addMsg('bot',`❌ 天气查询失败：${e.message}`);setMascot('error');}
+    }catch(e){appendWeatherFallback(e.message, typing);}
     resetStatus();return;
   }
 
@@ -3056,7 +3118,7 @@ async function sendChat(){
       div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherCard(weatherResult.label,w)}<div class="msg-time">${time}</div></div>`;
       document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
       setStatus('','✅ 天气查询成功');setMascot('success');setTimeout(()=>setMascot('idle'),2500);
-    }catch(e){typing.remove();addMsg('bot',`❌ 天气查询失败：${e.message}`);setMascot('error');}
+    }catch(e){appendWeatherFallback(e.message, typing);}
     resetStatus();return;
   }
 
