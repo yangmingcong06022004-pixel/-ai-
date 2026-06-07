@@ -775,8 +775,13 @@
     .planner-control-row{grid-template-columns:1fr 1fr;gap:8px;max-width:none}
     .planner-action{grid-column:1 / -1}
     .planner-pill{height:46px;padding:0 10px}
-    .demo-row{gap:6px}
-    .demo-btn{font-size:11px;padding:6px 10px}
+    .chat-hero,.chat-searchbar-wrap,.home-compose-row{overflow:visible;height:auto;min-height:auto;width:100%;max-width:100%}
+    .home-compose-input{min-height:52px;height:auto;overflow:visible;font-size:15px;line-height:1.4;min-width:0}
+    .demo-row{gap:6px;width:100%;max-width:100%;margin-top:14px;margin-bottom:18px;overflow-x:auto;overflow-y:visible;flex-wrap:nowrap;padding:2px 0 10px;-webkit-overflow-scrolling:touch;white-space:nowrap;scrollbar-width:none}
+    .demo-row::-webkit-scrollbar{display:none}
+    .demo-row-label,.demo-btn{flex:0 0 auto}
+    .demo-btn{font-size:11px;padding:7px 10px;min-height:34px;line-height:1.4;max-width:none;white-space:nowrap}
+    .feat-section-head{margin-top:2px}
     .planner-overview,.feature-grid{grid-template-columns:1fr!important;gap:9px}
     .feat-card,.planner-stat{padding:12px}
     .chat-home.task-started .chat-home-main{padding:10px 12px}
@@ -872,11 +877,15 @@
     .chat-hero-sub{font-size:12px;line-height:1.7}
     .planner-control-row{grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:none}
     .planner-action{grid-column:1/-1;width:100%;box-shadow:none}
-    .home-compose-row{grid-template-columns:1fr;width:100%;max-width:none}
+    .home-compose-row{grid-template-columns:1fr;width:100%;max-width:none;overflow:visible;height:auto;min-height:auto}
+    .home-compose-input{min-height:52px;height:auto;overflow:visible;font-size:15px;line-height:1.4;min-width:0}
     .planner-pill{height:48px;border-radius:12px;box-shadow:none}
     .planner-overview{grid-template-columns:1fr;gap:10px}
-    .demo-row{gap:7px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
-    .demo-row-label,.demo-btn{flex-shrink:0}
+    .demo-row{gap:8px;flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;width:100%;max-width:100%;margin-top:14px;margin-bottom:18px;padding:2px 0 10px;-webkit-overflow-scrolling:touch;white-space:nowrap;scrollbar-width:none}
+    .demo-row::-webkit-scrollbar{display:none}
+    .demo-row-label,.demo-btn{flex:0 0 auto}
+    .demo-btn{max-width:none;white-space:nowrap;min-height:34px;line-height:1.4}
+    .feat-section-head{margin-top:2px}
     .feat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     .feat-grid .feat-card:nth-of-type(n+7){display:none!important}
     body.mobile-more-open .feat-grid .feat-card:nth-of-type(n+7){display:block!important}
@@ -1215,6 +1224,28 @@ function scrollOpts(block='end'){
   const safeBlock = MOBILE_VIEWPORT.matches && block === 'end' ? 'nearest' : block;
   return {behavior:MOBILE_VIEWPORT.matches?'auto':'smooth',block:safeBlock};
 }
+const HOME_PLACEHOLDER_ZH = '一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队';
+const HOME_PLACEHOLDER_ZH_MOBILE = '例如：厦门1天，人均500，想拍照吃本地菜';
+const HOME_PLACEHOLDER_EN = 'Where to next? Example: Plan a 2-day Hangzhou trip with a 2000 RMB budget';
+const HOME_PLACEHOLDER_EN_MOBILE = 'Where? Days? Budget? Preference?';
+const CHAT_PLACEHOLDER_ZH = '继续调整当前方案，例如：少走路一点 / 换一家餐厅 / 预算降到300 / 改成特种兵';
+const CHAT_PLACEHOLDER_EN = 'Adjust the current plan, e.g. less walking / change restaurant / lower budget to 300';
+function getHomePlaceholder(){
+  if (currentPageLang === 'en') return MOBILE_VIEWPORT.matches ? HOME_PLACEHOLDER_EN_MOBILE : HOME_PLACEHOLDER_EN;
+  return MOBILE_VIEWPORT.matches ? HOME_PLACEHOLDER_ZH_MOBILE : HOME_PLACEHOLDER_ZH;
+}
+function getChatPlaceholder(){
+  return currentPageLang === 'en' ? CHAT_PLACEHOLDER_EN : CHAT_PLACEHOLDER_ZH;
+}
+function syncResponsivePlaceholders(){
+  const home = document.getElementById('chatHomeInput');
+  const chat = document.getElementById('chatInput');
+  if (home) home.placeholder = getHomePlaceholder();
+  if (chat) chat.placeholder = isHomeTaskStarted() ? getChatPlaceholder() : getHomePlaceholder();
+}
+if (MOBILE_VIEWPORT.addEventListener) MOBILE_VIEWPORT.addEventListener('change', syncResponsivePlaceholders);
+else if (MOBILE_VIEWPORT.addListener) MOBILE_VIEWPORT.addListener(syncResponsivePlaceholders);
+window.addEventListener('DOMContentLoaded', syncResponsivePlaceholders);
 
 function setText(id, text) {
   const el = document.getElementById(id);
@@ -1321,8 +1352,8 @@ const UI_COPY = {
     runtime:'<div class="runtime-cap-title">🍊 Agent · 运行时能力</div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🟡 本地生活 ›<div class="runtime-sub">本地生活资源 · 酒店 / 餐饮 / 景点 / 团购 · Mock 下单</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🗺️ 地图路线 ›<div class="runtime-sub">地图路线 · 备用地图 · 地图链接</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🍽️ 米其林推荐 ›<div class="runtime-sub">高端餐饮 · 星级推荐补充</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🖤 黑珍珠推荐 ›<div class="runtime-sub">高端餐饮 · 黑珍珠榜单补充</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🧠 用户记忆 ›<div class="runtime-sub">Soul / Hermes 偏好记忆</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">⚙️ Mock 执行 ›<div class="runtime-sub">打车 · 酒店 · 高铁 · 餐厅取号 · 门票</div></div>',
     heroTitle:'🍊 马到橙功 · 本地出游管家',
     heroSub:'一句话完成周末出游：吃喝玩乐、地图路线、预算控制、Mock 下单和异常兜底',
-    homePlaceholder:'一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队',
-    chatPlaceholder:'继续调整当前方案，例如：少走路一点 / 换一家餐厅 / 预算降到300 / 改成特种兵',
+    homePlaceholder:HOME_PLACEHOLDER_ZH,
+    chatPlaceholder:CHAT_PLACEHOLDER_ZH,
     route:'路线',
     budget:'预算',
     pace:'节奏',
@@ -1358,8 +1389,8 @@ const UI_COPY = {
     runtime:'<div class="runtime-cap-title">🍊 Agent · Runtime</div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🟡 Meituan Local Life ›<div class="runtime-sub">Longcat API · Meituan Skill · Hotel / Food / Sights / Deals · Mock order</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🗺️ Map & Route ›<div class="runtime-sub">Amap route · Baidu backup · Map links</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🍽️ Michelin Knowledge Base ›<div class="runtime-sub">Fine dining · star picks</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🖤 Black Pearl Knowledge Base ›<div class="runtime-sub">Fine dining · Black Pearl list</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">🧠 User Memory ›<div class="runtime-sub">Soul / Hermes preferences</div></div><div class="runtime-cap" onclick="this.classList.toggle(\'open\')">⚙️ Mock Exec ›<div class="runtime-sub">Taxi · Hotel · Train · Restaurant · Ticket</div></div>',
     heroTitle:'🍊 Travel Planning Workspace',
     heroSub:'Routes · Budget · Meituan Search🔍 · Michelin Knowledge Base · Memory',
-    homePlaceholder:'Where to next? Example: Plan a 2-day Hangzhou trip with a 2000 RMB budget',
-    chatPlaceholder:'Adjust the current plan, e.g. less walking / change restaurant / lower budget to 300',
+    homePlaceholder:HOME_PLACEHOLDER_EN,
+    chatPlaceholder:CHAT_PLACEHOLDER_EN,
     route:'Route',
     budget:'Budget',
     pace:'Pace',
@@ -1407,9 +1438,7 @@ function applyPageLanguage(lang) {
   if (heroTitle) heroTitle.textContent = c.heroTitle;
   const heroSub = document.querySelector('.chat-hero-sub');
   if (heroSub) heroSub.textContent = c.heroSub;
-  const home = document.getElementById('chatHomeInput');
-  const ta = document.getElementById('chatInput');
-  if (ta) ta.placeholder = isHomeTaskStarted() ? c.chatPlaceholder : c.homePlaceholder;
+  syncResponsivePlaceholders();
   document.querySelectorAll('.planner-stat').forEach((card, i) => {
     const labels = [c.route, c.budget, c.pace];
     const values = [c.waitingDest, c.budgetPending, c.balanced];
@@ -1469,7 +1498,7 @@ async function applyTranslatedPageLanguage(toLang, fromLang = 'zh') {
     '🧭 行程','','💬 历史','🌐 翻译','语言与翻译',
     '历史对话','搜索历史','清空历史','状态切换','',
     '🍊 马到橙功 · 本地出游管家','一句话完成周末出游：吃喝玩乐、地图路线、预算控制、Mock 下单和异常兜底',
-    '一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队',
+    HOME_PLACEHOLDER_ZH,
     '路线','预算','节奏','等待目的地','预算待定','均衡',
     '查看路线 →','查看预算 →','调整节奏 →','核心功能','展开更多 ↓','✨ 行程智能'
   ];
@@ -1497,12 +1526,8 @@ async function applyTranslatedPageLanguage(toLang, fromLang = 'zh') {
     if (el('uiPersonaHead')) el('uiPersonaHead').textContent = get(11);
     if (q('.chat-hero-title')) q('.chat-hero-title').textContent = get(13);
     if (q('.chat-hero-sub')) q('.chat-hero-sub').textContent = get(14);
-    if (el('chatHomeInput')) el('chatHomeInput').placeholder = get(15);
-    if (el('chatInput')) el('chatInput').placeholder = isHomeTaskStarted()
-      ? (toLang === 'zh'
-        ? '继续调整当前方案，例如：少走路一点 / 换一家餐厅 / 预算降到300 / 改成特种兵'
-        : 'Adjust the current plan, e.g. less walking / change restaurant / lower budget to 300')
-      : get(15);
+    currentPageLang = toLang === 'en' ? 'en' : 'zh';
+    syncResponsivePlaceholders();
     document.querySelectorAll('.planner-stat').forEach((card, i) => {
       const labels = [get(16), get(17), get(18)];
       const values = [get(19), get(20), get(21)];
@@ -1537,10 +1562,13 @@ function setInputLanguage(lang) {
   if (ai) ai.value = lang === 'en' ? 'en' : 'zh';
   const ta = document.getElementById('chatInput');
   const home = document.getElementById('chatHomeInput');
-  const zh = '继续调整当前方案，例如：少走路一点 / 换一家餐厅 / 预算降到300 / 改成特种兵';
-  const en = '可用英文输入，系统会自动翻译并规划';
-  if (ta) ta.placeholder = lang === 'en' ? en : (isHomeTaskStarted() ? zh : '一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队');
-  if (home) home.placeholder = lang === 'en' ? '可用英文输入，系统会自动翻译并规划' : '一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队';
+  if (lang === 'en') {
+    const enHome = MOBILE_VIEWPORT.matches ? HOME_PLACEHOLDER_EN_MOBILE : 'English input is OK; I will translate and plan automatically';
+    if (ta) ta.placeholder = isHomeTaskStarted() ? CHAT_PLACEHOLDER_EN : enHome;
+    if (home) home.placeholder = enHome;
+  } else {
+    syncResponsivePlaceholders();
+  }
 }
 
 function detectInputLanguage(text) {
@@ -2421,7 +2449,7 @@ async function startNewChat(){
   const input = document.getElementById('chatInput');
   if (input) {
     input.value = '';
-    input.placeholder = '一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队';
+    input.placeholder = getHomePlaceholder();
     autoResize(input);
   }
   const homeInput = document.getElementById('chatHomeInput');
@@ -2651,7 +2679,7 @@ function showChatConv(taskInput=''){
   document.getElementById('chatMessages').style.display='flex';
   document.getElementById('chatInputBar').style.display='flex';
   const chatInput = document.getElementById('chatInput');
-  if (chatInput) chatInput.placeholder = '继续调整当前方案，例如：少走路一点 / 换一家餐厅 / 预算降到300 / 改成特种兵';
+  if (chatInput) chatInput.placeholder = getChatPlaceholder();
   restoreChatHistoryToMessages();
 }
 
@@ -3786,7 +3814,7 @@ function toggleAgentMode(){
   btn.title=agentMode?'关闭智能 Agent':'开启智能 Agent';
   let lbl=btn.querySelector('.agent-on-label');
   if(agentMode){if(!lbl){lbl=document.createElement('div');lbl.className='agent-on-label';btn.appendChild(lbl);}lbl.textContent='智能模式';ta.placeholder='描述复杂需求，智能 Agent 自动规划…';}
-  else{if(lbl)lbl.remove();ta.placeholder=isHomeTaskStarted()?'继续调整当前方案，例如：少走路一点 / 换一家餐厅 / 预算降到300 / 改成特种兵':'一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队';}
+  else{if(lbl)lbl.remove();ta.placeholder=isHomeTaskStarted()?getChatPlaceholder():getHomePlaceholder();}
 }
 function createAgentCard(opts){
   const toilet = !!(opts && opts.toilet);
