@@ -1,0 +1,11 @@
+Flask==3.0.3
+flask-cors==4.0.1
+gunicorn==22.0.0
+requests==2.32.3
+pandas==2.2.3
+numpy==1.26.4
+beautifulsoup4==4.12.3
+pypdf==4.3.1
+scikit-learn==1.5.2
+openpyxl==3.1.5
+aiohttp==3.10.11

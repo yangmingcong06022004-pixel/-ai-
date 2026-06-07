@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: madochenggong-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --chdir backend app:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: LONGCAT_API_KEY
+        sync: false
+      - key: LONGCAT_MODEL
+        value: LongCat-2.0-Preview
+      - key: LONGCAT_URL
+        value: https://api.longcat.chat/openai/v1/chat/completions
+      - key: AMAP_WEBSERVICE_KEY
+        sync: false
+      - key: GAODE_KEY
+        sync: false
+      - key: AMAP_JSAPI_KEY
+        sync: false
+      - key: GAODE_JSAPI_KEY
+        sync: false
+      - key: AMAP_SECURITY_JS_CODE
+        sync: false
+      - key: AMAP_MCP_KEY
+        sync: false
