@@ -213,6 +213,13 @@
     .feat-card:active{transform:translateY(0)}
     .feat-card.hidden-card{display:none}
     .feat-card.hidden-card.show{display:block;animation:fadeSlideIn 0.22s ease}
+    .feature-result-host{margin-top:12px}
+    .feature-inline-result{border:1px solid var(--orange-line);border-radius:13px;background:linear-gradient(135deg,#fffdf8,#fff8ef);padding:13px 14px;line-height:1.65;max-height:none;min-height:0;box-shadow:0 2px 10px rgba(200,80,0,.05)}
+    .feature-inline-result.compact{max-width:760px}
+    .feature-inline-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+    .feature-inline-title{font-size:14px;font-weight:900;color:var(--t1)}
+    .feature-inline-close{border:1px solid var(--line);background:var(--bg1);border-radius:8px;color:var(--t2);font-size:12px;padding:3px 8px;cursor:pointer}
+    .feature-empty-card{border:1px solid var(--line);border-radius:10px;background:var(--bg1);padding:12px 13px;min-height:0;max-height:160px;color:var(--t2);font-size:13px;line-height:1.7}
     .feat-icon{width:32px;height:32px;border-radius:9px;margin-bottom:9px;display:flex;align-items:center;justify-content:center;font-size:16px}
     .feat-icon.orange{background:rgba(255,107,0,0.12)}
     .feat-icon.red{background:rgba(212,0,31,0.09)}
@@ -1074,19 +1081,20 @@
             <button class="feat-more-btn" id="featMoreBtn" onclick="toggleMoreCards()">更多工具 ↓</button>
           </div>
           <div class="feat-grid" id="featGrid">
-            <div class="feat-card" onclick="fillChatAndSend('搜我附近好吃的本地美食和团购')"><div class="feat-icon orange">🍽️</div><div class="feat-name">美团吃喝玩乐搜索</div><div class="feat-desc">搜索餐饮、酒店、景点、团购和本地生活资源</div></div>
-            <div class="feat-card" onclick="fillChatAndSend('帮我规划一条串联3-5个地点的出游路线并生成地图')"><div class="feat-icon blue">🗺️</div><div class="feat-name">路线地图卡生成</div><div class="feat-desc">自动串联 3-5 个地点，生成可执行路线地图卡</div></div>
-            <div class="feat-card" onclick="fillChatAndSend('帮我打车去最近的热门景点')"><div class="feat-icon red">🚕</div><div class="feat-name">Mock打车/下单</div><div class="feat-desc">生成待确认打车、酒店、门票、高铁和餐厅取号订单</div></div>
-            <div class="feat-card" onclick="fillChatAndSend('热门餐厅排队太久怎么办，帮我盯排队并准备备选餐厅')"><div class="feat-icon gold">⏱️</div><div class="feat-name">排队与时间兜底</div><div class="feat-desc">排队过久自动切换备选餐厅或调整路线</div></div>
-            <div class="feat-card" onclick="fillChatAndSend('我想要出片+美食的松弛感出游风格')"><div class="feat-icon purple">👥</div><div class="feat-name">出游人格模式</div><div class="feat-desc">家庭、情侣、特种兵、松弛感、穷游、出片党、美食脑袋</div></div>
-            <div class="feat-card" onclick="fillChatAndSend('帮我规划出游路线，并给出松弛感、特种兵、美食脑袋三种方案对比')"><div class="feat-icon purple">🔀</div><div class="feat-name">多方案对比</div><div class="feat-desc">松弛感、特种兵、美食脑袋三种方案一键对比</div></div>
-            <div class="feat-card hidden-card" onclick="queryPremiumDiningRag('帮我查询黑珍珠和米其林高端餐饮推荐')"><div class="feat-icon gold">💎</div><div class="feat-name">高端餐饮·黑珍珠/米其林</div><div class="feat-desc">结合黑珍珠/米其林榜单餐厅资料，补充高品质餐饮参考</div></div>
-            <div class="feat-card hidden-card" onclick="fillChatAndSend('查询当前位置实时天气')"><div class="feat-icon blue">🌤️</div><div class="feat-name">实时天气查询</div><div class="feat-desc">出发前查当前位置或任意城市实时天气</div></div>
-            <div class="feat-card hidden-card" onclick="fillChatAndSend('找离我最近的厕所')"><div class="feat-icon orange">🚻</div><div class="feat-name">找最近厕所</div><div class="feat-desc">按当前位置搜索附近公厕</div></div>
-            <div class="feat-card hidden-card" onclick="showRouteIntensity()"><div class="feat-icon gold">🧭</div><div class="feat-name">路线强度评估</div><div class="feat-desc">根据步行、天气和人群判断这条路线是否适合执行</div></div>
-            <div class="feat-card hidden-card" onclick="fillChatAndSend('出行装备清单')"><div class="feat-icon green">🎒</div><div class="feat-name">出行装备清单</div><div class="feat-desc">生成个性化装备检查提醒</div></div>
-            <div class="feat-card hidden-card" onclick="fillChatAndSend('遇到突发情况怎么处理')"><div class="feat-icon red">🚑</div><div class="feat-name">应急处置指南</div><div class="feat-desc">突发情况紧急处理与安全须知</div></div>
+            <div class="feat-card" onclick="handleFeatureAction('meituan_search')"><div class="feat-icon orange">🍽️</div><div class="feat-name">美团吃喝玩乐搜索</div><div class="feat-desc">搜索餐饮、酒店、景点、团购和本地生活资源</div></div>
+            <div class="feat-card" onclick="handleFeatureAction('route_map')"><div class="feat-icon blue">🗺️</div><div class="feat-name">路线地图卡生成</div><div class="feat-desc">自动串联 3-5 个地点，生成可执行路线地图卡</div></div>
+            <div class="feat-card" onclick="handleFeatureAction('mock_order')"><div class="feat-icon red">🚕</div><div class="feat-name">Mock打车/下单</div><div class="feat-desc">生成待确认打车、酒店、门票、高铁和餐厅取号订单</div></div>
+            <div class="feat-card" onclick="handleFeatureAction('queue_fallback')"><div class="feat-icon gold">⏱️</div><div class="feat-name">排队与时间兜底</div><div class="feat-desc">排队过久自动切换备选餐厅或调整路线</div></div>
+            <div class="feat-card" onclick="handleFeatureAction('persona_modes')"><div class="feat-icon purple">👥</div><div class="feat-name">出游人格模式</div><div class="feat-desc">家庭、情侣、特种兵、松弛感、穷游、出片党、美食脑袋</div></div>
+            <div class="feat-card" onclick="handleFeatureAction('multi_options')"><div class="feat-icon purple">🔀</div><div class="feat-name">多方案对比</div><div class="feat-desc">松弛感、特种兵、美食脑袋三种方案一键对比</div></div>
+            <div class="feat-card hidden-card" onclick="handleFeatureAction('high_end_dining')"><div class="feat-icon gold">💎</div><div class="feat-name">高端餐饮·黑珍珠/米其林</div><div class="feat-desc">结合黑珍珠/米其林榜单餐厅资料，补充高品质餐饮参考</div></div>
+            <div class="feat-card hidden-card" onclick="handleFeatureAction('weather')"><div class="feat-icon blue">🌤️</div><div class="feat-name">实时天气查询</div><div class="feat-desc">出发前查当前位置或任意城市实时天气</div></div>
+            <div class="feat-card hidden-card" onclick="handleFeatureAction('nearby_toilet')"><div class="feat-icon orange">🚻</div><div class="feat-name">找最近厕所</div><div class="feat-desc">按当前位置搜索附近公厕</div></div>
+            <div class="feat-card hidden-card" onclick="handleFeatureAction('route_intensity')"><div class="feat-icon gold">🧭</div><div class="feat-name">路线强度评估</div><div class="feat-desc">根据步行、天气和人群判断这条路线是否适合执行</div></div>
+            <div class="feat-card hidden-card" onclick="handleFeatureAction('packing_list')"><div class="feat-icon green">🎒</div><div class="feat-name">出行装备清单</div><div class="feat-desc">生成个性化装备检查提醒</div></div>
+            <div class="feat-card hidden-card" onclick="handleFeatureAction('emergency_guide')"><div class="feat-icon red">🚑</div><div class="feat-name">应急处置指南</div><div class="feat-desc">突发情况紧急处理与安全须知</div></div>
           </div>
+          <div class="feature-result-host" id="featureResultHost"></div>
         </div>
       </div>
 
@@ -3007,6 +3015,201 @@ function setBotCardHTML(msg, html) {
   const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
   body.innerHTML = `<div class="msg-text">${html}</div><div class="msg-time">${time}</div>`;
   msg.scrollIntoView(scrollOpts('end'));
+}
+
+function hasActivePlan(){return isHomeTaskStarted() && document.getElementById('chatMessages')?.style.display !== 'none';}
+function featureActionTitle(type){
+  return ({
+    weather:'实时天气查询',
+    nearby_toilet:'找最近厕所',
+    route_intensity:'路线强度评估',
+    packing_list:'出行装备清单',
+    emergency_guide:'应急处置指南',
+    high_end_dining:'高端餐饮推荐',
+    meituan_search:'本地生活资源',
+    route_map:'路线地图卡',
+    mock_order:'Mock 下单',
+    queue_fallback:'排队与时间兜底',
+    multi_options:'多方案对比',
+    persona_modes:'出游人格模式'
+  })[type] || '工具结果';
+}
+function getFeatureResultHost(){
+  if (hasActivePlan()) return document.getElementById('chatMessages');
+  return document.getElementById('featureResultHost');
+}
+function renderFeatureResult(type, bodyHTML, opts={}){
+  const host = getFeatureResultHost();
+  if (!host) return null;
+  const title = opts.title || featureActionTitle(type);
+  const active = hasActivePlan();
+  let card;
+  if (active) {
+    card = document.createElement('div');
+    card.className = 'feature-inline-result compact';
+    host.appendChild(card);
+  } else {
+    host.innerHTML = '';
+    card = document.createElement('div');
+    card.className = 'feature-inline-result';
+    host.appendChild(card);
+  }
+  card.innerHTML = `<div class="feature-inline-head"><div class="feature-inline-title">${escapeHTML(title)}</div><button class="feature-inline-close" type="button" onclick="this.closest('.feature-inline-result')?.remove()">收起</button></div><div class="feature-inline-body">${bodyHTML}</div>`;
+  card.scrollIntoView({behavior:MOBILE_VIEWPORT.matches?'auto':'smooth',block:'nearest'});
+  return card;
+}
+function setFeatureLoading(type, message){
+  return renderFeatureResult(type, `<div class="feature-empty-card"><span class="astep-loading">${escapeHTML(message || '正在处理，请稍候')}</span></div>`);
+}
+function featureSmallCard(text, actions=''){
+  return `<div class="feature-empty-card">${escapeHTML(text)}${actions ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${actions}</div>` : ''}</div>`;
+}
+function setHomeDraft(text){
+  const input = document.getElementById('chatHomeInput');
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+}
+async function readAgentFeatureFinal(message, userLocation=null){
+  const tripParams = getHomeTripParams();
+  const profileCfg = ROUTE_PROFILE_CONFIG[currentRouteProfile] || ROUTE_PROFILE_CONFIG[getRecommendedRouteProfile()];
+  const resp = await fetch(`${BACKEND}/api/agent`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      message,
+      city:document.getElementById('city')?.value?.trim() || '',
+      userLocation,
+      user_id:currentUserId,
+      session_id:chatSessionId,
+      history:chatHistory.slice(-4),
+      persona:currentPersonas.join(','),
+      personas:currentPersonas,
+      route_profile:profileCfg.apiName,
+      route_strategy:profileCfg.prompt,
+      map_provider:mapProvider,
+      travel_date:tripParams.travel_date,
+      people_count:tripParams.people_count,
+      budget:tripParams.budget,
+      budget_strategy:tripParams.budget_strategy,
+    })
+  });
+  if (!resp.ok) throw new Error('数据暂未返回，已启用备用方案。');
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', finalEvt = null;
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const evt = JSON.parse(line.slice(6));
+        if (evt.type === 'final') finalEvt = evt;
+      } catch {}
+    }
+  }
+  return finalEvt || {};
+}
+function buildRouteIntensityHTML(){
+  const data = window.__lastRouteCard;
+  const route = (data && Array.isArray(data.route_map)) ? data.route_map.filter(s=>s&&s.name) : [];
+  if (!route.length){
+    return `<div class="feature-empty-card">
+      <div style="font-weight:900;color:#9a4f00;margin-bottom:6px">还没有可评估路线</div>
+      请先生成行程，再查看路线强度。这个卡片不会创建新任务，也不会折叠首页。
+    </div>`;
+  }
+  let walkMin=0, taxiSeg=0;
+  route.forEach(s=>{
+    const t=String(s.next_transport||''); const dur=Number(s.next_duration_minutes||0);
+    if(/步行|walk/i.test(t)) walkMin+=dur; else if(t) taxiSeg++;
+  });
+  if(walkMin===0 && taxiSeg===0) walkMin = route.length*12;
+  const walkKm = Math.round(walkMin*0.07*10)/10;
+  const level = walkKm<3?'低':(walkKm<=6?'中':'高');
+  const sugg=[];
+  if(walkKm>6) sugg.push('建议减少点位或把长距离段改打车');
+  else if(walkKm>4) sugg.push('建议加入一个咖啡/商场休息点');
+  else sugg.push('强度较轻，适合松弛感执行');
+  return `<div style="font-size:13px;line-height:1.8;color:var(--t1)">
+    路线强度：<b>${level}</b><br>
+    预计步行：约 ${walkKm}km（约 ${walkMin} 分钟）<br>
+    节点数：${route.length} 个 · 交通段：${taxiSeg} 段
+    <div style="margin-top:8px;color:#7a4520">建议：${escapeHTML(sugg.join('；'))}</div>
+  </div>`;
+}
+async function handleFeatureAction(featureType){
+  console.log('[FEATURE_ACTION]', featureType);
+  if (featureType === 'weather') {
+    setFeatureLoading(featureType, '正在查询当前位置天气...');
+    try {
+      const data = await fetchWeatherForIntent({intent:'weather',city:'当前位置',use_location:true}, document.getElementById('city')?.value?.trim() || '');
+      renderFeatureResult(featureType, renderWeatherCard(data.label, data.data.data));
+    } catch (e) {
+      renderFeatureResult(featureType, featureSmallCard('天气数据暂未返回，出发前建议再次确认。'));
+    } finally { setStatus('', '就绪'); setMascot('idle'); }
+    return;
+  }
+  if (featureType === 'nearby_toilet') {
+    setFeatureLoading(featureType, '正在读取当前位置并查找最近卫生间...');
+    const gps = await getGPS(6000);
+    if (!gps) {
+      renderFeatureResult(featureType, featureSmallCard('请允许浏览器定位后重试；我会优先查明确厕所，再查商场、地铁站、公园等可能有卫生间的地点。', `<button class="pending-order-btn" type="button" onclick="handleFeatureAction('nearby_toilet')">重新定位</button>`));
+      return;
+    }
+    try {
+      const msg = `找离我最近的厕所（我的当前位置：纬度${gps.lat.toFixed(6)},经度${gps.lng.toFixed(6)}）`;
+      const evt = await readAgentFeatureFinal(msg, gps);
+      const payload = evt.payload?.reply_type === 'nearby_toilet_results' ? evt.payload : _extractNearbyToiletJSON(evt.text || '');
+      renderFeatureResult(featureType, payload ? renderNearbyToiletResultsCard(payload) : featureSmallCard('附近暂未找到明确厕所，我可以继续查商场、地铁站、公园。', `<button class="pending-order-btn" type="button" onclick="handleFeatureAction('nearby_toilet')">扩大范围重试</button>`));
+    } catch (e) {
+      renderFeatureResult(featureType, featureSmallCard('附近暂未找到明确厕所，我可以继续查商场、地铁站、公园。', `<button class="pending-order-btn" type="button" onclick="handleFeatureAction('nearby_toilet')">扩大范围重试</button>`));
+    }
+    return;
+  }
+  if (featureType === 'route_intensity') {
+    renderFeatureResult(featureType, buildRouteIntensityHTML());
+    return;
+  }
+  if (featureType === 'high_end_dining') {
+    setFeatureLoading(featureType, '正在整理榜单餐厅资料...');
+    const q = '帮我查询黑珍珠和米其林高端餐饮推荐';
+    try {
+      const res = await fetch(`${BACKEND}/api/rag/premium_dining`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q, city:document.getElementById('city')?.value?.trim() || ''})});
+      const data = await res.json();
+      renderFeatureResult(featureType, (!res.ok || data.error) ? featureSmallCard('暂未找到该城市榜单餐厅，可切换城市或使用美团搜索。') : renderPremiumDiningRagCard(data));
+    } catch (e) {
+      renderFeatureResult(featureType, featureSmallCard('暂未找到该城市榜单餐厅，可切换城市或使用美团搜索。'));
+    }
+    return;
+  }
+  const draftMap = {
+    meituan_search:'搜我附近好吃的本地美食和团购',
+    route_map:'帮我规划一条串联3-5个地点的出游路线并生成地图',
+    mock_order:'帮我打车去最近的热门景点',
+    queue_fallback:'热门餐厅排队太久怎么办，帮我盯排队并准备备选餐厅',
+    multi_options:'帮我规划出游路线，并给出松弛感、特种兵、美食脑袋三种方案对比'
+  };
+  if (featureType === 'packing_list') {
+    renderFeatureResult(featureType, `<div class="feature-empty-card">建议携带：充电宝、纸巾、雨伞/防晒、常用药、身份证件、少量现金。生成行程后我会按天气和路线强度细化装备。</div>`);
+    return;
+  }
+  if (featureType === 'emergency_guide') {
+    renderFeatureResult(featureType, `<div class="feature-empty-card">安全提示：保留同行人联系方式，夜间优先公共交通/正规打车，遇到排队或天气变化先切换备选点。紧急情况请优先联系当地求助电话。</div>`);
+    return;
+  }
+  if (featureType === 'persona_modes') {
+    renderFeatureResult(featureType, `<div class="feature-empty-card">左侧可切换松弛感、特种兵、家庭、长辈友好、出片党、美食脑袋。当前不会新建任务，生成行程时会一起生效。</div>`);
+    return;
+  }
+  const draft = draftMap[featureType] || '';
+  if (draft) setHomeDraft(draft);
+  renderFeatureResult(featureType, featureSmallCard('我已把这个工具需求放进首页输入框。确认目的地、日期、人数和预算后，点击“生成行程”即可。', `<button class="pending-order-btn" type="button" onclick="submitHomeInput()">生成行程</button>`));
 }
 
 async function queryPremiumDiningRag(defaultQuery) {
