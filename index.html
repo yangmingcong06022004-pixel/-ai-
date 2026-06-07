@@ -843,6 +843,54 @@
   .price-sim-window-price{font-size:16px;font-weight:900;color:#0f766e;margin:2px 0}
   .price-sim-window-tag{font-size:9px;color:var(--t3);font-family:var(--mono)}
   .price-sim-tip{font-size:11px;color:var(--t2);line-height:1.6;padding:8px 10px;background:rgba(255,107,0,.04);border-radius:9px;border:1px solid rgba(255,107,0,.1)}
+  @media (max-width:768px){
+    html,body{height:100%;overflow-x:hidden;overflow-y:hidden}
+    body{min-height:100%;overscroll-behavior-y:contain}
+    .topbar{height:56px;padding:0 14px;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+    .top-logo{width:32px;height:32px;font-size:28px;filter:none}
+    .top-name{font-size:18px}
+    .top-tag,.top-status,.sidebar,.insight-panel,.chat-home-sidebar,.left-panel,.right-panel{display:none!important}
+    .workspace,.workspace.insight-collapsed{display:block;grid-template-columns:1fr;flex:1;min-height:0;overflow:hidden}
+    .workspace:before{display:none}
+    .panel,.chat-panel{width:100%;height:calc(100vh - 56px);min-height:0;overflow:hidden}
+    .chat-home{display:block;height:100%;min-height:0;overflow:hidden}
+    .chat-home-main,.chat-conv-area,.result-panel{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-left:16px;padding-right:16px;padding-bottom:104px}
+    .chat-home-main{max-width:none;margin:0;padding-top:24px;gap:16px}
+    .chat-home.task-started .chat-home-main{padding:10px 14px 104px}
+    .chat-hero-title{font-size:24px;line-height:1.25;letter-spacing:1px}
+    .chat-hero-sub{font-size:12px;line-height:1.7}
+    .planner-control-row{grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:none}
+    .planner-action{grid-column:1/-1;width:100%;box-shadow:none}
+    .planner-pill{height:48px;border-radius:12px;box-shadow:none}
+    .planner-overview{grid-template-columns:1fr;gap:10px}
+    .demo-row{gap:7px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+    .demo-row-label,.demo-btn{flex-shrink:0}
+    .feat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .feat-grid .feat-card:nth-of-type(n+7){display:none!important}
+    body.mobile-more-open .feat-grid .feat-card:nth-of-type(n+7){display:block!important}
+    .feat-card{min-height:132px;padding:12px;box-shadow:none;transition:none}
+    .feat-card:hover{transform:none;box-shadow:none}
+    .feat-card:before{display:none}
+    .chat-input-bar{position:sticky;bottom:0;z-index:20;padding:10px 12px max(10px,env(safe-area-inset-bottom));background:#fbf7ef;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+    .chat-textarea{max-height:88px}
+    .chat-conv-area{padding-top:14px}
+    .msg,.msg-body,.msg.wide-agent .msg-body{max-width:100%}
+    .agent-card,.chat-route,.meituan-trip-card,.weekend-plan-card,.panorama-trip-card,.mt-card,.mt-mini,.planner-stat,.route-choice-card,.weather-card,.ai-card,.steps-card,.m-card,.route-bar,.intent-lock-card,.pending-order-card,.feat-card{box-shadow:none!important}
+    .chat-searchbar,.chat-textarea,.field input,.field select,.michelin-input{box-shadow:none!important}
+    .topbar,.chat-input-bar,.planner-pill,.planner-action,.feat-card,.agent-card,.meituan-trip-card,.weekend-plan-card,.panorama-trip-card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important}
+    .cr-live-map-box,.mt-map-box,.wp-map{height:240px!important;min-height:220px!important;max-height:260px!important}
+    .wp-main,.pt-main,.mt-dashboard-grid,.mt-overview-grid,.mt-budget-grid,.mt-hotel-grid,.mt-day-grid,.wp-stop-list,.wp-activities,.wp-risk-row,.pt-leg-grid,.pt-rule-row,.pending-order-items,.intent-lock-grid,.route-card-grid{grid-template-columns:1fr!important}
+    .wp-status-flow,.pt-status-flow,.mt-status-flow,.route-profile-grid,.metrics{grid-template-columns:1fr 1fr!important}
+    .wp-map:before,.wp-mini-map:before,.wp-pin-label{display:none!important}
+    .wp-live-map,.mt-live-map,.cr-live-map{contain:paint;transform:translateZ(0)}
+    .wp-pin-num,.wp-mini-dot,.agent-toggle-btn,.voice-btn,.chat-send{box-shadow:none!important}
+    .cursor-blink,.typing-dots span,.agent-hd-pulse.anim,.tk-row.running,.mascot-svg{animation:none!important}
+    *,*:before,*:after{transition-duration:.01ms!important;scroll-behavior:auto!important}
+  }
+  @media (max-width:420px){
+    .planner-control-row{grid-template-columns:1fr}
+    .planner-action{grid-column:auto}
+  }
   </style>
 </head>
 <body>
@@ -1147,6 +1195,8 @@ let voiceFinalText = '';
 let mapRuntimeConfig = null;
 let voiceAutoSend = true;
 let lastHomeTaskInput = '';
+const MOBILE_VIEWPORT = window.matchMedia('(max-width: 768px)');
+function scrollOpts(block='end'){return {behavior:MOBILE_VIEWPORT.matches?'auto':'smooth',block};}
 
 function setText(id, text) {
   const el = document.getElementById(id);
@@ -2594,6 +2644,7 @@ function restoreChatHistoryToMessages(){
 }
 function toggleMoreCards(){
   moreCardsOpen=!moreCardsOpen;
+  document.body.classList.toggle('mobile-more-open', moreCardsOpen);
   document.querySelectorAll('.hidden-card').forEach(el=>el.classList.toggle('show',moreCardsOpen));
   const btn=document.getElementById('featMoreBtn'),chip=document.getElementById('moreChipBtn');
   if(btn)btn.textContent=moreCardsOpen?'收起 ↑':'展开更多 ↓';
@@ -2712,7 +2763,7 @@ function appendWeatherFallback(message, typing){
   const time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
   const div=document.createElement('div');div.className='msg bot';
   div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherFallbackCard(message)}<div class="msg-time">${time}</div></div>`;
-  document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
+  document.getElementById('chatMessages').appendChild(div);div.scrollIntoView(scrollOpts('end'));
   setStatus('','天气服务暂时繁忙，已启用兜底');setMascot('idle');
 }
 
@@ -2777,14 +2828,14 @@ function addMsg(role,content,routeData){
   const cleanContent = content ? `<div class="msg-text">${cleanHTMLText(content)}</div>` : '';
   div.innerHTML=`<div class="msg-avatar">${avatar}</div><div class="msg-body">${cleanContent}${extra}<div class="msg-time">${time}</div></div>`;
   document.getElementById('chatMessages').appendChild(div);
-  div.scrollIntoView({behavior:'smooth',block:'end'});
+  div.scrollIntoView(scrollOpts('end'));
   return div;
 }
 function addTyping(){
   const div=document.createElement('div');div.className='msg bot';div.id='typing';
   div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body"><div class="msg-text" style="padding:0"><div class="typing-dots"><span></span><span></span><span></span></div></div></div>`;
   document.getElementById('chatMessages').appendChild(div);
-  div.scrollIntoView({behavior:'smooth',block:'end'});
+  div.scrollIntoView(scrollOpts('end'));
   return div;
 }
 
@@ -2947,7 +2998,7 @@ function setBotCardHTML(msg, html) {
   if (!body) return;
   const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
   body.innerHTML = `<div class="msg-text">${html}</div><div class="msg-time">${time}</div>`;
-  msg.scrollIntoView({behavior:'smooth', block:'end'});
+  msg.scrollIntoView(scrollOpts('end'));
 }
 
 async function queryPremiumDiningRag(defaultQuery) {
@@ -3071,7 +3122,7 @@ async function sendChat(){
       const w=wData.data,time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
       const div=document.createElement('div');div.className='msg bot';
       div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherCard(weatherResult.label,w)}<div class="msg-time">${time}</div></div>`;
-      document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
+      document.getElementById('chatMessages').appendChild(div);div.scrollIntoView(scrollOpts('end'));
       setStatus('','✅ 天气查询成功');setMascot('success');setTimeout(()=>setMascot('idle'),2500);
     }catch(e){appendWeatherFallback(e.message, typing);}
     resetStatus();return;
@@ -3128,7 +3179,7 @@ async function sendChat(){
       const w=wData.data,time=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
       const div=document.createElement('div');div.className='msg bot';
       div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body">${renderWeatherCard(weatherResult.label,w)}<div class="msg-time">${time}</div></div>`;
-      document.getElementById('chatMessages').appendChild(div);div.scrollIntoView({behavior:'smooth',block:'end'});
+      document.getElementById('chatMessages').appendChild(div);div.scrollIntoView(scrollOpts('end'));
       setStatus('','✅ 天气查询成功');setMascot('success');setTimeout(()=>setMascot('idle'),2500);
     }catch(e){appendWeatherFallback(e.message, typing);}
     resetStatus();return;
@@ -3153,9 +3204,9 @@ async function sendChat(){
   const aiEl=document.createElement('div');aiEl.className='msg bot';
   aiEl.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body"><div class="msg-text" id="chatAIText"></div><div class="msg-time">${timeStr}</div></div>`;
   document.getElementById('chatMessages').appendChild(aiEl);
-  aiEl.scrollIntoView({behavior:'smooth',block:'end'});
+  aiEl.scrollIntoView(scrollOpts('end'));
   await streamAI(routeData,aiLang,document.getElementById('chatAIText'));
-  aiEl.scrollIntoView({behavior:'smooth',block:'end'});
+  aiEl.scrollIntoView(scrollOpts('end'));
   // ✅ 保存路线对话到历史
   appendChatHistory('user', input);
   appendChatHistory('assistant', `路线规划：${routeData.start.name} → ${routeData.destination.name}，${routeData.route.distance_km}km`);
@@ -3493,7 +3544,7 @@ function createAgentCard(opts){
   const home=document.getElementById('chatHome');
   if(home&&home.style.display!=='none')showChatConv();
   document.getElementById('chatMessages').appendChild(div);
-  div.scrollIntoView({behavior:'smooth',block:'end'});
+  div.scrollIntoView(scrollOpts('end'));
   if (!toilet) _startAgentTimer(id); // 🚻 找厕所不显示"生成路线"计时文案
   return id;
 }
@@ -3564,7 +3615,7 @@ function addAgentStep(cardId,sid,toolName,toolInput){
   if (document.getElementById(`tdot_intent_${cardId}`)?.className.includes('running')) {
     taskTreeFinishIntent(cardId, `识别到 ${meta.label} 需求`);
   }
-  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView({behavior:'smooth',block:'end'});
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts('end'));
 }
 function addCompletedAgentStep(cardId, toolName, summary, chip='地图') {
   if (window._toiletCards && window._toiletCards[cardId]) return;
@@ -5476,7 +5527,7 @@ function showRouteIntensity(){
   }
   const div=document.createElement('div'); div.className='msg bot';
   div.innerHTML=`<div class="msg-avatar">🍊</div><div class="msg-body"><div class="agent-card" style="padding:14px 16px">${html}</div></div>`;
-  wrap.appendChild(div); div.scrollIntoView({behavior:'smooth',block:'end'});
+  wrap.appendChild(div); div.scrollIntoView(scrollOpts('end'));
 }
 function routeCardCityMismatch(data = {}) {
   const city = String(data.city || data.destination || data.render_city || '');
@@ -5950,7 +6001,7 @@ function appendMeituanRealCard(cardId, evt){
        <div style="font-weight:700;color:#0b8f3a;font-size:13px">🍽️ 已补充美团真实资源</div>
        <div style="font-size:12px;color:var(--t2);margin-top:4px">${escapeHTML(evt.message||'以下商户来自美团真实资源，营业和订位需二次确认。')}</div>${cards}
      </div>`);
-  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView({behavior:'smooth',block:'end'});
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts('end'));
 }
 
 function decodeMeituanItem(encodedPayload){
@@ -6013,7 +6064,7 @@ function replaceMeituanIntoRoute(encodedPayload, sourceCardId){
   bot.innerHTML = `<div class="msg-avatar">🍊</div><div class="msg-body">${renderMapFirstCard(base, `branch_${Date.now()}`)}<div class="msg-time">${now()}</div></div>`;
   document.getElementById('chatConv')?.appendChild(bot);
   appendChatHistory('assistant', {message_type:'trip_plan', content:base.summary, plan_json:base});
-  bot.scrollIntoView({behavior:'smooth',block:'end'});
+  bot.scrollIntoView(scrollOpts('end'));
 }
 function renderRouteRetryActions(cardId, message, source) {
   const safeMessage = escapeHTML(message || '真实候选点不足，暂不生成路线卡。请补充当前目的地的景点或餐饮数据后重试。');
@@ -6057,7 +6108,7 @@ function _registerPlanBranch(cardId, bodyEl){
   let switcher = '';
   if (window.__planBranches.length >= 2){
     const tabs = window.__planBranches.slice(-6).map(v =>
-      '<button class="pending-order-btn secondary" style="font-size:11px;padding:3px 9px;'+(v.cardId===cardId?'background:#e85c00;color:#fff;border-color:#e85c00':'')+'" onclick="document.getElementById(\'agentMsg_'+v.cardId+'\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})">'+escapeHTML(v.label)+'</button>').join('');
+      '<button class="pending-order-btn secondary" style="font-size:11px;padding:3px 9px;'+(v.cardId===cardId?'background:#e85c00;color:#fff;border-color:#e85c00':'')+'" onclick="document.getElementById(\'agentMsg_'+v.cardId+'\')?.scrollIntoView(scrollOpts(\'start\'))">'+escapeHTML(v.label)+'</button>').join('');
     switcher = '<div style="margin:0 0 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:var(--t3)">方案版本：</span>'+tabs+'</div>';
   }
   if ((banner||switcher) && bodyEl) bodyEl.insertAdjacentHTML('afterbegin', switcher + banner);
@@ -6102,7 +6153,7 @@ function showAgentFinal(cardId,text,taskState,payload){
       w.appendChild(renderOptionButtons(taskState.options));
     }
   }
-  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView({behavior:'smooth',block:'end'});
+  document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView(scrollOpts('end'));
 }
 
 /* ── Task State：方案按钮 + 右侧面板 ── */
