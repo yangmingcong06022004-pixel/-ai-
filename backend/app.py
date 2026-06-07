@@ -3332,8 +3332,8 @@ def _extract_trip_requirements(prompt: str, city_hint: str = "") -> dict:
     avoid_delivery = bool(re.search(r"外卖不想在美团点|不想点外卖|不点外卖|不想.*点外卖|不要外卖", s))
     avoid_hotel_booking = bool(re.search(r"酒店不想在美团订|不想订酒店|不订酒店|不想.*订酒店|不要.*订酒店|不在美团.*订酒店", s))
     plan_only = bool(re.search(r"只要规划|只做规划|只帮我安排路线|只安排路线|只做行程|不(?:要|用).*下单", s))
-    wants_meituan = bool(re.search(r"结合美团|美团上|推荐美团|美团券|找团购|团购|找券|美团酒店|美团订酒店|美团下单|点外卖|买团购|真实店名|美团.*(?:推荐|有什么|找|看看|订|下单)", s)) and not avoid_meituan
-    requires_real_meituan = bool(re.search(r"真实(?:的)?(?:美团)?(?:店名|酒店|商家)|美团上真实|真实美团|美团.*真实", s)) and not avoid_meituan
+    wants_meituan = _requires_meituan_real_resources(s) and not avoid_meituan
+    requires_real_meituan = bool(re.search(r"查看真实商户|真实(?:的)?(?:美团)?(?:店名|酒店|商家|评分|人均)|美团上真实|真实美团|美团.*真实", s)) and not avoid_meituan
     intent = "meituan_trip_plan" if (wants_meituan or requires_real_meituan) else "trip_plan_only"
     if avoid_meituan:
         intent = "no_meituan"
@@ -3544,13 +3544,25 @@ def _looks_meituan_trip(text: str) -> bool:
     core = re.search(r"行程|攻略|规划|安排|预算|酒店|住宿|宾馆|民宿|美团|景点|门票|一日游|两日游|三日游|周末游|[0-9一二两三四五六七八九十]{1,3}\s*天|去.+玩|旅游|旅行|游玩", s)
     return bool(core and re.search(r"去|到|前往|玩|行程|规划|安排|预算|酒店|住宿|美团|景点", s))
 
-def _looks_direct_meituan_resource(text: str) -> bool:
+MEITUAN_REAL_INTENT_RE = re.compile(
+    r"美团上|美团|团购|优惠券?|订酒店|酒店预订|美团酒店|美团餐厅|美团下单|查看真实商户|"
+    r"真实店名|真实评分|真实人均|门票团购",
+    re.I,
+)
+
+def _requires_meituan_real_resources(text: str) -> bool:
     s = str(text or "")
     if re.search(r"不想在美团|不要美团|不用美团|不想用美团|不在美团", s):
         return False
+    return bool(MEITUAN_REAL_INTENT_RE.search(s))
+
+def _looks_direct_meituan_resource(text: str) -> bool:
+    s = str(text or "")
+    if not _requires_meituan_real_resources(s):
+        return False
     if re.search(r"行程|规划|攻略|[0-9一二两三四五六七八九十]{1,3}\s*天|旅游|旅行|游玩|去.+玩", s):
         return False
-    has_resource = re.search(r"酒店|住宿|宾馆|民宿|餐厅|美食|吃饭|好吃|外卖|团购|券|优惠|跑腿|帮送|真实店名|商家", s)
+    has_resource = re.search(r"酒店|住宿|宾馆|民宿|餐厅|美食|吃饭|好吃|外卖|团购|券|优惠|跑腿|帮送|真实店名|真实评分|真实人均|真实商户|商家|门票", s)
     return bool(has_resource)
 
 def _looks_public_facility_search(text: str) -> bool:
@@ -4911,7 +4923,7 @@ def tool_mock_book_resource(booking_kind: str = "hotel", city: str = "",
     city = city or ctx.get("city") or "本地"
     seed = f"{city}|{kind}|{keyword}"
     base_name = keyword or preset["names"][_mock_int(seed + "name", 0, len(preset["names"]) - 1)]
-    merchant_name = f"{city}{base_name}"
+    merchant_name = f"{base_name}（Mock演示）" if keyword else f"{city}{preset['label']}·Mock演示"
     spot = preset["spot"][_mock_int(seed + "spot", 0, len(preset["spot"]) - 1)]
     price = _mock_int(seed + "price", preset["low"], preset["high"])
     rating = round(4.3 + _mock_int(seed + "rate", 0, 6) / 10, 1)
@@ -4921,6 +4933,9 @@ def tool_mock_book_resource(booking_kind: str = "hotel", city: str = "",
         "name": merchant_name,
         "city": city,
         "category": preset["label"],
+        "source": "mock_fallback",
+        "is_real_merchant": False,
+        "mock_notice": "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。",
         "price_estimate": price,
         "rating": str(rating),
         "address": address,
@@ -4929,8 +4944,9 @@ def tool_mock_book_resource(booking_kind: str = "hotel", city: str = "",
             "type": preset["type"], "name": merchant_name, "price": str(price),
             "rating": str(rating), "address": address,
         }],
-        "recommend_reason": f"已按评分、价格、位置匹配{preset['label']}，等待确认后模拟下单。",
+        "recommend_reason": f"Mock 演示数据，非真实商户；已生成{preset['label']}待确认动作，等待确认后模拟下单。",
     }
+    print("[MOCK_MARKED_AS_NON_REAL]")
     pending = tool_create_pending_order(preset["type"], item, {**ctx, "city": city})
     return {"success": True, "type": f"{kind}_booking", "booking_kind": kind,
             "merchant": merchant, "order": pending["order"]}
@@ -5486,6 +5502,75 @@ def _real_meituan_items(result: dict, limit: int = 5) -> list:
         item["can_order"] = True
         normalized.append(item)
     return normalized
+
+def _meituan_category_from_intent(intent: str = "", keyword: str = "") -> str:
+    text = f"{intent} {keyword}"
+    if re.search(r"hotel|酒店|住宿|宾馆|民宿", text, re.I):
+        return "hotel"
+    if re.search(r"ticket|门票|景点|活动", text, re.I):
+        return "ticket"
+    if re.search(r"group|团购|优惠|券", text, re.I):
+        return "deal"
+    return "restaurant"
+
+def _normalize_meituan_append_item(item: dict) -> dict:
+    item = item if isinstance(item, dict) else {}
+    price = item.get("avg_price") or item.get("cost") or item.get("price") or ""
+    return {
+        "name": item.get("name") or "",
+        "rating": item.get("rating") or "",
+        "avg_price": price,
+        "address": item.get("address") or item.get("area") or "",
+        "area": item.get("area") or "",
+        "distance": item.get("distance") or "",
+        "tags": item.get("tags") if isinstance(item.get("tags"), list) else ([item.get("type")] if item.get("type") else []),
+        "source": "meituan_real",
+        "is_real_merchant": True,
+        "need_verify": True,
+        "can_order": False,
+        "lat": item.get("lat"),
+        "lng": item.get("lng"),
+        "raw": {k: v for k, v in item.items() if k in ("type", "category", "deal_available", "data_level")},
+    }
+
+def _meituan_append_payload(success: bool, city: str, category: str, items: list = None,
+                            message: str = "", keyword: str = "") -> dict:
+    normalized = [_normalize_meituan_append_item(x) for x in (items or []) if isinstance(x, dict) and x.get("name")]
+    if success and normalized:
+        print(f"[MEITUAN_REAL_RESULTS_COUNT] {len(normalized)}")
+        return {
+            "type": "meituan_append",
+            "reply_type": "meituan_real_append",
+            "success": True,
+            "city": city or "",
+            "category": category or "restaurant",
+            "keyword": keyword or "",
+            "count": len(normalized),
+            "items": normalized[:6],
+            "results": normalized[:6],
+            "actions": [
+                {"label": "替换进路线", "action_type": "replace_route_with_meituan_item", "payload": {}},
+                {"label": "生成 Mock 取号/预订", "action_type": "restaurant_confirm", "payload": {}},
+                {"label": "查看地图路线", "action_type": "open_amap_route", "payload": {}},
+                {"label": "换一家", "action_type": "replace_restaurant", "payload": {}},
+            ],
+            "message": message or "已补充美团真实资源",
+        }
+    print("[MEITUAN_REAL_RESULTS_COUNT] 0")
+    print("[MOCK_FALLBACK_USED] meituan_real_unavailable")
+    print("[MOCK_MARKED_AS_NON_REAL]")
+    return {
+        "type": "meituan_append",
+        "reply_type": "meituan_real_append",
+        "success": False,
+        "city": city or "",
+        "category": category or "restaurant",
+        "keyword": keyword or "",
+        "items": [],
+        "results": [],
+        "message": message or "美团真实资源暂未返回，当前可使用 Mock 演示",
+        "mock_notice": "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。",
+    }
 
 def _meituan_cli_query(intent: str, city: str, keyword: str, filters: dict) -> str:
     filters = filters or {}
@@ -10435,18 +10520,22 @@ def _rule_meituan_trip_agent_response(user_message: str, city_hint: str,
             "commerce_mode": req.get("commerce_mode"),
             "planner_mode": req.get("planner_mode"),
         }
+        print(f"[INTENT_DETECTED] destination={req.get('destination')} intent={req.get('intent')} planner={req.get('planner_mode')}")
         yield f"data: {json.dumps({'type':'step_start','id':1,'tool':'deepseek_intent','input':intent_input}, ensure_ascii=False)}\n\n"
         intent_summary = f"已识别：{req.get('destination')} · {req.get('days')}天 · 预算{req.get('budget')}元"
         yield f"data: {json.dumps({'type':'step_done','id':1,'tool':'deepseek_intent','result':{'success':True, **intent_input},'summary':intent_summary}, ensure_ascii=False)}\n\n"
         longcat_input = {"city": req.get("destination"), "user_prompt": user_message, "resource_types": ["hotel", "restaurant", "sight", "groupbuy"], "limit": 8}
         # 普通出游规划不强调美团真实资源；仅在用户明确美团意图时才在任务树展示美团龙猫/美团 Skill 步骤
-        can_show_meituan = bool(req.get("wants_meituan") or req.get("requires_real_meituan")) and not req.get("user_preference", {}).get("avoid_meituan")
+        can_show_meituan = _requires_meituan_real_resources(user_message) and not req.get("user_preference", {}).get("avoid_meituan")
+        print(f"[MEITUAN_INTENT_REQUIRED] {str(bool(can_show_meituan)).lower()}")
         mt_intent = "hotel_search" if req.get("wants_hotel") else "restaurant_search"
         mt_keyword = "酒店" if req.get("wants_hotel") else "本地菜 团购"
+        mt_category = _meituan_category_from_intent(mt_intent, mt_keyword)
         mt_pool = None
         mt_future = None
         mt_t0 = None
         mt_deferred = False
+        mt_results = []
         if can_show_meituan:
             yield f"data: {json.dumps({'type':'step_start','id':2,'tool':'longcat_resource_search','input':longcat_input}, ensure_ascii=False)}\n\n"
             mt_input = {"intent": mt_intent, "city": req.get("destination"), "keyword": mt_keyword, "limit": 6}
@@ -10454,6 +10543,7 @@ def _rule_meituan_trip_agent_response(user_message: str, city_hint: str,
             # 美团真实资源放后台线程，与行程规划并行；主流程不阻塞等待
             mt_pool = ThreadPoolExecutor(max_workers=1)
             mt_t0 = time.time()
+            print(f"[MEITUAN_REAL_QUERY_START] city={req.get('destination')} intent={mt_intent} keyword={mt_keyword}")
             mt_future = mt_pool.submit(tool_call_meituan_skill, mt_intent, req.get("destination"), mt_keyword, "", None, None, {}, 6)
         yield f"data: {json.dumps({'type':'step_start','id':3,'tool':tool_name,'input':args}, ensure_ascii=False)}\n\n"
         plan = tool_plan_meituan_trip(**args)
@@ -10461,19 +10551,22 @@ def _rule_meituan_trip_agent_response(user_message: str, city_hint: str,
         if can_show_meituan:
             yield f"data: {json.dumps({'type':'step_done','id':2,'tool':'longcat_resource_search','result':lc_payload,'summary':_tool_summary('longcat_resource_search', longcat_input, lc_payload)}, ensure_ascii=False)}\n\n"
             # 主流程最多前台等 3s（规划本身已耗时，通常此处直接转后台补充）
-            mt_results = []
             try:
                 mt_res = mt_future.result(timeout=max(0.1, mt_t0 + MEITUAN_FOREGROUND_TIMEOUT - time.time()))
                 mt_results = _enrich_real_merchant_fields([x for x in (mt_res.get("results") or []) if _is_real_meituan_item(x)])
             except FuturesTimeout:
                 mt_deferred = True
+                print("[MEITUAN_REAL_QUERY_TIMEOUT] foreground")
             except Exception:
                 mt_deferred = True
             if mt_results:
+                print(f"[MEITUAN_REAL_RESULTS_COUNT] {len(mt_results)}")
                 mt_payload = {"success": True, "city": req.get("destination"), "keyword": mt_keyword,
                               "count": len(mt_results), "results": mt_results[:6], "source": "meituan_skill", "is_real_meituan": True}
             else:
                 mt_deferred = True
+                if not mt_results:
+                    print("[MEITUAN_REAL_QUERY_TIMEOUT] foreground_no_result")
                 mt_payload = {"success": False, "pending": True, "city": req.get("destination"), "keyword": mt_keyword,
                               "source": "meituan_skill", "message": "美团真实资源正在后台补充，当前先生成可执行方案"}
             yield f"data: {json.dumps({'type':'step_done','id':4,'tool':'call_meituan_skill','result':mt_payload,'summary':_tool_summary('call_meituan_skill', mt_input, mt_payload)}, ensure_ascii=False)}\n\n"
@@ -10496,6 +10589,8 @@ def _rule_meituan_trip_agent_response(user_message: str, city_hint: str,
         sm = _tool_summary(tool_name, args, plan)
         yield f"data: {json.dumps({'type':'step_done','id':3,'tool':tool_name,'result':plan,'summary':sm}, ensure_ascii=False)}\n\n"
         yield f"data: {json.dumps({'type':'final','text':final_text or _meituan_trip_final_text(plan)}, ensure_ascii=False)}\n\n"
+        if can_show_meituan and mt_results and not mt_deferred:
+            yield f"data: {json.dumps(_meituan_append_payload(True, req.get('destination'), mt_category, mt_results, '已补充美团真实资源，可替换进路线 / 生成 Mock 取号或预订', mt_keyword), ensure_ascii=False)}\n\n"
         # 后台补充：美团真实商户在 MEITUAN_BACKGROUND_TIMEOUT 内返回则追加商户卡，否则提示已用备用方案
         if can_show_meituan and mt_deferred and mt_future is not None:
             try:
@@ -10504,12 +10599,15 @@ def _rule_meituan_trip_agent_response(user_message: str, city_hint: str,
                 bg = {}
             bg_real = _enrich_real_merchant_fields([x for x in (bg.get("results") or []) if _is_real_meituan_item(x)]) if isinstance(bg, dict) else []
             if bg_real:
-                append_payload = {"type": "meituan_append", "success": True, "city": req.get("destination"),
-                                  "keyword": mt_keyword, "source": "meituan_skill", "count": len(bg_real),
-                                  "results": bg_real[:6], "message": "已补充美团真实资源，可加入行程 / 生成待确认订单"}
+                append_payload = _meituan_append_payload(
+                    True, req.get("destination"), mt_category, bg_real,
+                    "已补充美团真实资源，可替换进路线 / 生成 Mock 取号或预订", mt_keyword
+                )
             else:
-                append_payload = {"type": "meituan_append", "success": False, "city": req.get("destination"),
-                                  "message": "美团资源暂未返回，已使用备用方案，不影响当前路线"}
+                append_payload = _meituan_append_payload(
+                    False, req.get("destination"), mt_category, [],
+                    "美团真实资源暂未返回，当前可使用 Mock 演示", mt_keyword
+                )
             yield f"data: {json.dumps(append_payload, ensure_ascii=False)}\n\n"
         if mt_pool is not None:
             mt_pool.shutdown(wait=False)
@@ -10801,6 +10899,9 @@ def _rule_public_facility_agent_response(user_message: str, city_hint: str) -> R
 def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> Response:
     def generate():
         args = _direct_meituan_skill_input(user_message, city_hint)
+        category = _meituan_category_from_intent(args.get("intent", ""), args.get("keyword", ""))
+        print(f"[INTENT_DETECTED] direct_meituan_resource city={args.get('city')} intent={args.get('intent')} keyword={args.get('keyword')}")
+        print("[MEITUAN_INTENT_REQUIRED] true")
         lc_input = {"city": args["city"], "user_prompt": user_message, "resource_types": [args.get("intent", "restaurant_search")], "limit": args["limit"]}
         yield f"data: {json.dumps({'type':'step_start','id':1,'tool':'longcat_resource_search','input':lc_input}, ensure_ascii=False)}\n\n"
         lc_result = tool_call_longcat_resource_search(args["city"], user_message, [args.get("intent", "restaurant_search")], args["limit"])
@@ -10811,6 +10912,7 @@ def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> 
         yield f"data: {json.dumps({'type':'step_start','id':2,'tool':'call_meituan_skill','input':args}, ensure_ascii=False)}\n\n"
         mt_pool = ThreadPoolExecutor(max_workers=1)
         mt_t0 = time.perf_counter()
+        print(f"[MEITUAN_REAL_QUERY_START] city={args['city']} intent={args['intent']} keyword={args['keyword']}")
         mt_future = mt_pool.submit(
             tool_call_meituan_skill,
             args["intent"], args["city"], args["keyword"], args["location"],
@@ -10821,6 +10923,7 @@ def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> 
             result = mt_future.result(timeout=MEITUAN_FOREGROUND_TIMEOUT)
         except FuturesTimeout:
             meituan_deferred = True
+            print("[MEITUAN_REAL_QUERY_TIMEOUT] foreground")
             result = {"success": False, "intent": args["intent"], "city": args["city"],
                       "keyword": args["keyword"], "source": "meituan_skill", "is_real_meituan": False}
         if meituan_deferred:
@@ -10829,6 +10932,7 @@ def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> 
                                "message": "美团真实资源正在后台补充，当前先生成可执行方案"}
             yield f"data: {json.dumps({'type':'step_done','id':2,'tool':'call_meituan_skill','result':pending_payload,'summary':'美团真实资源后台补充中'}, ensure_ascii=False)}\n\n"
         else:
+            print(f"[MEITUAN_REAL_RESULTS_COUNT] {len(result.get('results') or [])}")
             yield f"data: {json.dumps({'type':'step_done','id':2,'tool':'call_meituan_skill','result':result,'summary':_tool_summary('call_meituan_skill', args, result)}, ensure_ascii=False)}\n\n"
 
         amap_keyword = _amap_keyword_from_resource_args(args)
@@ -10858,6 +10962,8 @@ def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> 
         mock_items = []
         if not has_real:
             mock_items = _mock_resource_fallback(args["city"], amap_keyword, args.get("intent", ""))
+            print("[MOCK_FALLBACK_USED] direct_meituan_resource")
+            print("[MOCK_MARKED_AS_NON_REAL]")
             result = {**result, "success": True, "results": mock_items, "count": len(mock_items),
                       "source": "mock_fallback", "fallback": True}
         pending_order = {}
@@ -10889,6 +10995,8 @@ def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> 
         if meituan_deferred:
             text += "\n🍊 美团真实资源正在后台补充，稍候将自动追加真实商户卡片。"
         yield f"data: {json.dumps({'type':'final','text':text}, ensure_ascii=False)}\n\n"
+        if fg_has_real and result.get("results"):
+            yield f"data: {json.dumps(_meituan_append_payload(True, args['city'], category, result.get('results') or [], '已补充美团真实资源，可替换进路线 / 生成 Mock 取号或预订', args['keyword']), ensure_ascii=False)}\n\n"
 
         # ── 后台补充：美团结果在 MEITUAN_BACKGROUND_TIMEOUT(20s)内返回则追加真实商户卡片；仍无则提示已用备用方案 ──
         if meituan_deferred:
@@ -10902,15 +11010,15 @@ def _rule_meituan_resource_agent_response(user_message: str, city_hint: str) -> 
             bg_real = bg.get("results") if (isinstance(bg, dict) and bg.get("success")) else []
             if bg_real:
                 _enrich_real_merchant_fields(bg_real)
-                append_payload = {"type": "meituan_append", "success": True,
-                                  "city": args["city"], "keyword": args["keyword"],
-                                  "source": bg.get("source", "meituan_skill"),
-                                  "count": len(bg_real), "results": bg_real[:6],
-                                  "message": "已补充美团真实资源，可加入行程 / 生成待确认订单"}
+                append_payload = _meituan_append_payload(
+                    True, args["city"], category, bg_real,
+                    "已补充美团真实资源，可替换进路线 / 生成 Mock 取号或预订", args["keyword"]
+                )
             else:
-                append_payload = {"type": "meituan_append", "success": False,
-                                  "city": args["city"],
-                                  "message": "美团资源暂未返回，已使用备用方案，不影响当前路线"}
+                append_payload = _meituan_append_payload(
+                    False, args["city"], category, [],
+                    "美团真实资源暂未返回，当前可使用 Mock 演示", args["keyword"]
+                )
             yield f"data: {json.dumps(append_payload, ensure_ascii=False)}\n\n"
         mt_pool.shutdown(wait=False)
     return Response(stream_with_context(generate()), mimetype="text/event-stream",

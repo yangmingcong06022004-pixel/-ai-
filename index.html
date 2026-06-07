@@ -3234,9 +3234,9 @@ const TOOL_AGENT_MAP = {
 const AGENT_WORKFLOW_STEPS = [
   {n:1, label:'理解需求', sub:'城市 · 天数 · 预算 · 出游风格'},
   {n:2, label:'读取偏好', sub:'不吃辣 · 地铁优先 · 不赶路 · 排队容忍低'},
-  {n:3, label:'搜索美团本地生活资源', sub:'餐饮 / 酒店 / 景点 / 团购'},
-  {n:4, label:'生成路线地图卡', sub:'3-5个节点 · 景点 + 餐饮 + 夜景'},
-  {n:5, label:'检查预算与风险', sub:'预算未超 · 排队风险 · 天气提醒'},
+  {n:3, label:'生成可信路线', sub:'真实地点 · 地图路线 · 预算'},
+  {n:4, label:'检查行程合理性', sub:'顺路性 · 时间强度 · 预算'},
+  {n:5, label:'补充本地生活资源', sub:'按需后台补充真实商户'},
   {n:6, label:'等待确认', sub:'Mock打车 / 餐厅取号 / 订酒店 / 订高铁 / 订门票'}
 ];
 
@@ -3353,17 +3353,18 @@ function updateAgentWorkflowForTool(cardId, toolName, state = 'running', summary
     setAgentTechStatus(cardId, 'deepseek', running ? 'running' : 'done');
     setAgentTechStatus(cardId, 'memory', running ? 'running' : 'done');
   } else if (['longcat_resource_search','call_meituan_skill','search_places'].includes(toolName)) {
-    setAgentWorkflowStep(cardId, 3, running ? 'running' : 'done', running ? '餐饮 / 酒店 / 景点 / 团购' : (ok ? '餐饮 / 酒店 / 景点 / 团购已匹配' : friendly));
+    setAgentWorkflowStep(cardId, 5, running ? 'running' : 'done', running ? '真实商户后台补充中' : (ok ? '本地生活资源已补充' : friendly));
     setAgentTechStatus(cardId, toolName === 'longcat_resource_search' ? 'longcat' : 'meituan', running ? 'running' : (ok ? 'done' : 'warn'));
   } else if (['plan_meituan_trip','independent_trip_planner','plan_weekend_trip','plan_panorama_trip'].includes(toolName)) {
     setAgentWorkflowStep(cardId, 1, running ? 'running' : 'done');
     setAgentWorkflowStep(cardId, 2, running ? 'running' : 'done');
-    setAgentWorkflowStep(cardId, 3, running ? 'running' : 'done', running ? '正在搜索美团本地生活资源' : '本地生活资源与行程骨架已生成');
+    setAgentWorkflowStep(cardId, 3, running ? 'running' : 'done', running ? '正在生成可信路线' : '可信路线已生成');
+    if (!running) setAgentWorkflowStep(cardId, 4, 'done', '行程强度与预算已检查');
   } else if (['deepseek_route_json','amap_poi','amap_route','amap_map_link','amap_travel_planner','plan_route','plan_transit'].includes(toolName)) {
-    setAgentWorkflowStep(cardId, 4, running ? 'running' : 'done', running ? '正在生成路线地图卡' : (ok ? '路线地图卡已生成' : friendly));
+    setAgentWorkflowStep(cardId, 3, running ? 'running' : 'done', running ? '正在生成路线地图卡' : (ok ? '路线地图卡已生成' : friendly));
     setAgentTechStatus(cardId, toolName === 'deepseek_route_json' ? 'deepseek' : 'map', running ? 'running' : (ok ? 'done' : 'warn'));
   } else if (['get_weather','estimate_distance','simulate_price_scenario','patch_plan_item','mock_start_service_monitor','mock_get_monitor_status'].includes(toolName)) {
-    setAgentWorkflowStep(cardId, 5, running ? 'running' : 'done', running ? '正在检查预算与风险' : (ok ? '预算、排队与天气已检查' : friendly));
+    setAgentWorkflowStep(cardId, 4, running ? 'running' : 'done', running ? '正在检查行程合理性' : (ok ? '预算、排队与天气已检查' : friendly));
     if (toolName.includes('mock')) setAgentTechStatus(cardId, 'mock', running ? 'running' : (ok ? 'done' : 'warn'));
   } else if (['mock_request_ride','mock_search_flights','mock_book_train','mock_book_resource','create_pending_order','confirm_mock_order'].includes(toolName)) {
     setAgentWorkflowStep(cardId, 6, running ? 'running' : 'done', running ? '等待用户确认执行动作' : (ok ? '待确认动作已生成' : '待确认动作可稍后重试'));
@@ -5907,32 +5908,105 @@ function renderTaxiOrderResult(data) {
 function appendMeituanRealCard(cardId, evt){
   const b = document.getElementById(`agentFinalBody_${cardId}`);
   if (!b) return;
+  console.log('[MEITUAN_REAL_APPEND_RENDERED]', evt);
   if (!evt.success){
     b.insertAdjacentHTML('beforeend',
-      `<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:#fff8e7;color:#9a7040;font-size:12px">⚠️ ${escapeHTML(evt.message||'美团资源暂未返回，已使用备用方案')}</div>`);
+      `<div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:#fff8e7;color:#9a7040;font-size:12px;line-height:1.7">
+        ⚠️ ${escapeHTML(evt.message||'美团真实资源暂未返回，当前可使用 Mock 演示')}<br>
+        <b>Mock 演示数据，非真实商户，仅用于黑客松端到端演示。</b>
+      </div>`);
+    console.log('[MOCK_FALLBACK_USED]', evt);
+    console.log('[MOCK_MARKED_AS_NON_REAL]');
     return;
   }
-  const cards = (evt.results||[]).map(p => {
+  const items = evt.items || evt.results || [];
+  const cards = items.map((p, idx) => {
     const tags = (p.tags||[]).map(t=>`<span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:999px;background:#eef6f1;color:#0b6f5f;font-size:10px">${escapeHTML(String(t))}</span>`).join('');
     const deal = p.deal_available ? `<span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:999px;background:#ffeede;color:#d2691e;font-size:10px">可团购</span>` : '';
-    const dist = p.distance ? ` · 📍${escapeHTML(String(p.distance))}m` : '';
+    const dist = p.distance ? ` · 距离${escapeHTML(String(p.distance))}${String(p.distance).includes('m') ? '' : 'm'}` : '';
+    const payload = encodeURIComponent(JSON.stringify({...p, city: evt.city || p.city || '', category: evt.category || ''}));
     return `<div style="margin-top:8px;padding:10px 12px;border:1px solid rgba(14,128,92,.16);border-radius:10px;background:#fff">
       <div style="font-weight:700;color:var(--t1);font-size:13px">${escapeHTML(p.name||'')}</div>
-      <div style="color:var(--t2);font-size:12px;margin-top:3px">⭐${escapeHTML(String(p.rating||'-'))} · 人均¥${escapeHTML(String(p.avg_price||p.cost||'-'))}${dist}</div>
+      <div style="color:var(--t2);font-size:12px;margin-top:3px">评分 ${escapeHTML(String(p.rating||'-'))} · 人均 ${escapeHTML(String(p.avg_price||p.cost||'-'))}${dist}</div>
       <div style="color:var(--t2);font-size:12px">${escapeHTML(p.address||'')}</div>
-      <div style="margin-top:4px">${deal}${tags}<span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:999px;background:#e7f7ec;color:#0b8f3a;font-size:10px">美团真实资源</span></div>
+      <div style="margin-top:4px">${deal}${tags}<span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:999px;background:#e7f7ec;color:#0b8f3a;font-size:10px">来源：美团真实资源</span><span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:999px;background:#fff8e7;color:#9a7040;font-size:10px">需二次确认营业/排队</span></div>
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <button class="pending-order-btn" onclick="fillChatAndSend('帮我把${escapeHTML(p.name||'')}加入行程')">加入行程</button>
-        <button class="pending-order-btn" onclick="fillChatAndSend('帮我预订${escapeHTML(p.name||'')}')">生成待确认订单</button>
+        <button class="pending-order-btn" onclick="replaceMeituanIntoRoute('${payload}', '${cardId}')">替换进路线</button>
+        <button class="pending-order-btn" onclick="runMeituanItemAction('${payload}', '${cardId}', 'booking')">生成 Mock 取号/预订</button>
+        <button class="pending-order-btn secondary" onclick="runMeituanItemAction('${payload}', '${cardId}', 'map')">查看地图路线</button>
         <button class="pending-order-btn secondary" onclick="fillChatAndSend('换一家${escapeHTML(evt.city||'')}美团商户')">换一家</button>
       </div>
     </div>`;
   }).join('');
   b.insertAdjacentHTML('beforeend',
     `<div style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(14,128,92,.2)">
-       <div style="font-weight:700;color:#0b8f3a;font-size:12px">🍊 ${escapeHTML(evt.message||'已补充美团真实资源')}</div>${cards}
+       <div style="font-weight:700;color:#0b8f3a;font-size:13px">🍽️ 已补充美团真实资源</div>
+       <div style="font-size:12px;color:var(--t2);margin-top:4px">${escapeHTML(evt.message||'以下商户来自美团真实资源，营业和订位需二次确认。')}</div>${cards}
      </div>`);
   document.getElementById(`agentMsg_${cardId}`)?.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function decodeMeituanItem(encodedPayload){
+  try { return JSON.parse(decodeURIComponent(encodedPayload || '')); } catch(e) { return {}; }
+}
+
+function runMeituanItemAction(encodedPayload, cardId, mode){
+  const item = decodeMeituanItem(encodedPayload);
+  if (!item.name) return;
+  if (mode === 'booking') {
+    handleAction({
+      action_type:'restaurant_confirm',
+      label:'生成 Mock 取号/预订',
+      payload:{restaurant_name:item.name, city:item.city || '', people_count:1},
+      requires_confirm:true
+    }, cardId);
+    return;
+  }
+  handleAction({
+    action_type:'open_amap_route',
+    label:'查看地图路线',
+    payload:{city:item.city || '', route_points:[item.name], destination:item.name, lat:item.lat, lng:item.lng},
+    requires_confirm:false
+  }, cardId);
+}
+
+function replaceMeituanIntoRoute(encodedPayload, sourceCardId){
+  const item = decodeMeituanItem(encodedPayload);
+  const base = window.__lastRouteCard ? JSON.parse(JSON.stringify(window.__lastRouteCard)) : null;
+  if (!base || !Array.isArray(base.route_map) || !base.route_map.length || !item.name) {
+    fillChatAndSend(`把${item.name || '这家美团真实商户'}替换进当前路线`);
+    return;
+  }
+  const foodIdx = base.route_map.findIndex(s => /餐|食|吃|小吃|咖啡|饭|菜|团购|酒店|住宿/.test(String(s.type || '') + String(s.name || '')));
+  const idx = foodIdx >= 0 ? foodIdx : Math.min(1, base.route_map.length - 1);
+  const oldName = base.route_map[idx]?.name || '原餐饮/酒店节点';
+  base.route_map[idx] = {
+    ...base.route_map[idx],
+    name: item.name,
+    type: item.category === 'hotel' ? '酒店' : '餐饮',
+    short_desc: '来源：美团真实资源，需二次确认营业/排队情况',
+    reason: '替换为真实商户',
+    data_source: 'meituan_real',
+    display_source: '本地生活数据',
+    is_real_poi: true,
+    is_real_merchant: true,
+    need_verify: true,
+    can_order: true,
+    risk: '需二次确认营业/排队情况',
+    lat: item.lat || base.route_map[idx]?.lat,
+    lng: item.lng || base.route_map[idx]?.lng,
+    known_info: {address:item.address || '未知', rating:item.rating || '未知', price:item.avg_price || '未知', opening_hours:'未知'}
+  };
+  base.title = `方案B：加入美团真实商户版`;
+  base.summary = `已将「${item.name}」替换进路线，原节点「${oldName}」保留在原方案中。`;
+  window.__pendingBranch = {label:'方案B：美团真实商户版', changes:[`替换：${oldName} → ${item.name}`, '原方案未覆盖', '营业/排队需二次确认']};
+  const bot = document.createElement('div');
+  bot.className = 'msg bot';
+  bot.id = `agentMsg_branch_${Date.now()}`;
+  bot.innerHTML = `<div class="msg-avatar">🍊</div><div class="msg-body">${renderMapFirstCard(base, `branch_${Date.now()}`)}<div class="msg-time">${now()}</div></div>`;
+  document.getElementById('chatConv')?.appendChild(bot);
+  appendChatHistory('assistant', {message_type:'trip_plan', content:base.summary, plan_json:base});
+  bot.scrollIntoView({behavior:'smooth',block:'end'});
 }
 function renderRouteRetryActions(cardId, message, source) {
   const safeMessage = escapeHTML(message || '真实候选点不足，暂不生成路线卡。请补充当前目的地的景点或餐饮数据后重试。');
