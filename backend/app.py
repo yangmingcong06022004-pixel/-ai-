@@ -1446,11 +1446,30 @@ def _history_conn():
     conn.row_factory = sqlite3.Row
     return conn
 
+def _safe_user_id(value: str = "") -> str:
+    raw = str(value or "").strip()
+    safe = re.sub(r"[^A-Za-z0-9_.:-]", "_", raw)[:80]
+    return safe or "default_user"
+
+def _request_user_id(payload: dict = None) -> str:
+    payload = payload if isinstance(payload, dict) else {}
+    return _safe_user_id(
+        payload.get("user_id")
+        or request.headers.get("X-User-ID")
+        or request.args.get("user_id")
+        or payload.get("session_user_id")
+        or ""
+    )
+
+def _scoped_session_id(session_id: str = "default", user_id: str = "") -> str:
+    return f"{_safe_user_id(user_id)}:{session_id or 'default'}"
+
 def _init_history_db():
     with _history_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL DEFAULT 'default_user',
                 session_id TEXT NOT NULL DEFAULT 'default',
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
@@ -1462,6 +1481,7 @@ def _init_history_db():
         """)
         existing_cols = {r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)").fetchall()}
         for col, ddl in {
+            "user_id": "ALTER TABLE chat_messages ADD COLUMN user_id TEXT NOT NULL DEFAULT 'default_user'",
             "message_type": "ALTER TABLE chat_messages ADD COLUMN message_type TEXT DEFAULT 'text'",
             "plan_json": "ALTER TABLE chat_messages ADD COLUMN plan_json TEXT",
             "order_json": "ALTER TABLE chat_messages ADD COLUMN order_json TEXT",
@@ -1471,6 +1491,8 @@ def _init_history_db():
                 conn.execute(ddl)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages(user_id, created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_session ON chat_messages(user_id, session_id, created_at DESC)")
         try:
             conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts
@@ -1562,7 +1584,8 @@ def _history_row_to_dict(row) -> dict:
 def _save_history_message(role: str, content: str, city: str = "",
                           persona: str = "", session_id: str = "default",
                           lang: str = "zh", message_type: str = "text",
-                          plan_json=None, order_json=None, meta_json=None) -> dict:
+                          plan_json=None, order_json=None, meta_json=None,
+                          user_id: str = "default_user") -> dict:
     text = _clean_markdown(content)
     parsed_plan = plan_json if isinstance(plan_json, dict) else None
     parsed_meta = meta_json if isinstance(meta_json, dict) else None
@@ -1588,18 +1611,20 @@ def _save_history_message(role: str, content: str, city: str = "",
     plan_text = json.dumps(parsed_plan, ensure_ascii=False) if parsed_plan else (plan_json if isinstance(plan_json, str) else None)
     order_text = json.dumps(order_json, ensure_ascii=False) if isinstance(order_json, dict) else (order_json if isinstance(order_json, str) else None)
     meta_text = json.dumps(parsed_meta, ensure_ascii=False) if isinstance(parsed_meta, dict) else (meta_json if isinstance(meta_json, str) else None)
+    user_id = _safe_user_id(user_id)
     with _history_conn() as conn:
         cur = conn.execute(
-            """INSERT INTO chat_messages(session_id, role, message_type, content, plan_json, order_json, meta_json, city, persona, lang, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (session_id or "default", role or "assistant", message_type or "text", text[:8000], plan_text, order_text, meta_text, city or "", persona or "", lang or "zh", now),
+            """INSERT INTO chat_messages(user_id, session_id, role, message_type, content, plan_json, order_json, meta_json, city, persona, lang, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (user_id, session_id or "default", role or "assistant", message_type or "text", text[:8000], plan_text, order_text, meta_text, city or "", persona or "", lang or "zh", now),
         )
-        print(f"[HISTORY_SAVE] message_type={message_type or 'text'}")
+        print(f"[HISTORY_SAVE] user_id={user_id} message_type={message_type or 'text'}")
         return {"id": cur.lastrowid, "created_at": now}
 
-def _search_history(q: str = "", limit: int = 30) -> list:
+def _search_history(q: str = "", limit: int = 30, user_id: str = "default_user") -> list:
     q = (q or "").strip()
     limit = max(1, min(int(limit or 30), 80))
+    user_id = _safe_user_id(user_id)
     with _history_conn() as conn:
         if q:
             rows = []
@@ -1607,24 +1632,24 @@ def _search_history(q: str = "", limit: int = 30) -> list:
                 rows = conn.execute("""
                     SELECT m.* FROM chat_messages_fts f
                     JOIN chat_messages m ON m.id = f.rowid
-                    WHERE chat_messages_fts MATCH ?
+                    WHERE chat_messages_fts MATCH ? AND m.user_id = ?
                     ORDER BY rank
                     LIMIT ?
-                """, (q, limit)).fetchall()
+                """, (q, user_id, limit)).fetchall()
             except Exception:
                 rows = []
             if not rows:
                 like = f"%{q}%"
                 rows = conn.execute("""
                     SELECT * FROM chat_messages
-                    WHERE content LIKE ? OR city LIKE ? OR persona LIKE ?
+                    WHERE user_id = ? AND (content LIKE ? OR city LIKE ? OR persona LIKE ?)
                     ORDER BY created_at DESC
                     LIMIT ?
-                """, (like, like, like, limit)).fetchall()
+                """, (user_id, like, like, like, limit)).fetchall()
         else:
-            rows = conn.execute("SELECT * FROM chat_messages ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            rows = conn.execute("SELECT * FROM chat_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?", (user_id, limit)).fetchall()
     items = [_history_row_to_dict(r) for r in rows]
-    print(f"[HISTORY_LOAD] count={len(items)}")
+    print(f"[HISTORY_LOAD] user_id={user_id} count={len(items)}")
     return items
 
 _init_history_db()
@@ -4377,13 +4402,18 @@ def _order_validation_tags(item: dict, user_context: dict = None) -> list:
 def tool_create_pending_order(order_type: str, item: dict, user_context: dict = None) -> dict:
     order_id = "MDCG-" + uuid.uuid4().hex[:8].upper()
     now = int(time.time())
-    validation_tags = _order_validation_tags(item or {}, user_context or {})
+    ctx = user_context or {}
+    user_id = _safe_user_id(ctx.get("user_id") or ctx.get("session_user_id") or "")
+    session_id = str(ctx.get("session_id") or "default").strip() or "default"
+    validation_tags = _order_validation_tags(item or {}, ctx)
     order = {
         "order_id": order_id,
+        "user_id": user_id,
+        "session_id": session_id,
         "status": "pending_confirm",
         "order_type": order_type or "unknown",
         "item": item or {},
-        "user_context": user_context or {},
+        "user_context": {**ctx, "user_id": user_id, "session_id": session_id},
         "validation_tags": validation_tags,
         "created_at": now,
         "expire_in_minutes": 15,
@@ -4445,10 +4475,14 @@ def _build_booking_dispatch(order: dict) -> dict:
         "user_receipt": user_receipt,
     }
 
-def tool_confirm_mock_order(order_id: str) -> dict:
+def tool_confirm_mock_order(order_id: str, user_id: str = "") -> dict:
     order = PENDING_ORDERS.get(order_id)
     if not order:
         return {"success": False, "error": "订单不存在或已过期"}
+    expected_user_id = order.get("user_id") or "default_user"
+    request_user_id = _safe_user_id(user_id or expected_user_id)
+    if expected_user_id != "default_user" and request_user_id != expected_user_id:
+        return {"success": False, "error": "订单不属于当前用户"}
     order["status"] = "mock_order_success"
     order["confirmed_at"] = int(time.time())
     dispatch = _build_booking_dispatch(order)
@@ -10900,12 +10934,12 @@ def _rule_amap_route_response(user_message: str, city_hint: str) -> Response:
     return Response(stream_with_context(generate()), mimetype="text/event-stream",
                     headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
 
-def _rule_confirm_order_response(user_message: str) -> Response:
+def _rule_confirm_order_response(user_message: str, user_id: str = "") -> Response:
     def generate():
         order_id = _extract_order_id(user_message)
         args = {"order_id": order_id}
         yield f"data: {json.dumps({'type':'step_start','id':1,'tool':'confirm_mock_order','input':args}, ensure_ascii=False)}\n\n"
-        result = tool_confirm_mock_order(order_id)
+        result = tool_confirm_mock_order(order_id, user_id)
         summary = _tool_summary("confirm_mock_order", args, result)
         yield f"data: {json.dumps({'type':'step_done','id':1,'tool':'confirm_mock_order','result':result,'summary':summary}, ensure_ascii=False)}\n\n"
         text = result.get("message") if result.get("success") else result.get("error", "订单确认失败")
@@ -11104,11 +11138,13 @@ def run_deepseek_agent(user_message: str, city_hint: str = "上海",
                        history: list = None, persona: str = "",
                        route_profile: str = "", route_strategy: str = "",
                        map_provider: str = "", extra_system: str = "",
-                       body_coords: dict = None) -> Response:
+                       body_coords: dict = None, user_id: str = "",
+                       session_id: str = "default") -> Response:
+    user_id = _safe_user_id(user_id)
     _update_soul_memory_from_message(user_message)
     if _extract_order_id(user_message) and re.search(r"确认|下单|预订|就这个", user_message):
         print("[RULE_ROUTER] intent=mock_order_confirm")
-        return _rule_confirm_order_response(user_message)
+        return _rule_confirm_order_response(user_message, user_id)
     if _looks_weather_only_query(user_message):
         print("[RULE_ROUTER] intent=weather_fast")
         return _rule_weather_agent_response(user_message, city_hint)
@@ -11358,10 +11394,10 @@ def run_deepseek_agent(user_message: str, city_hint: str = "上海",
                         tr = tool_create_pending_order(
                             order_type=fa.get("order_type", "unknown"),
                             item=fa.get("item", {}),
-                            user_context=fa.get("user_context", {}),
+                            user_context={**fa.get("user_context", {}), "user_id": user_id, "session_id": session_id},
                         )
                     elif fn == "confirm_mock_order":
-                        tr = tool_confirm_mock_order(fa.get("order_id", ""))
+                        tr = tool_confirm_mock_order(fa.get("order_id", ""), user_id)
                     elif fn == "patch_plan_item":
                         tr = tool_patch_plan_item(
                             item_type=fa.get("item_type","hotel"),
@@ -11437,10 +11473,13 @@ def api_plan_route():
 @app.route("/api/order/create_pending", methods=["POST"])
 def api_create_pending_order():
     b = request.get_json(force=True)
+    user_id = _request_user_id(b)
+    session_id = b.get("session_id", "default")
+    user_context = {**(b.get("user_context") or {}), "user_id": user_id, "session_id": session_id}
     r = tool_create_pending_order(
         order_type=b.get("order_type", "hotel"),
         item=b.get("item", {}),
-        user_context=b.get("user_context", {}),
+        user_context=user_context,
     )
     return jsonify(r)
 
@@ -11451,7 +11490,7 @@ def api_confirm_mock_order():
     order_id = b.get("order_id", "")
     if not order_id:
         return jsonify({"success": False, "error": "order_id不能为空"}), 400
-    r = tool_confirm_mock_order(order_id)
+    r = tool_confirm_mock_order(order_id, _request_user_id(b))
     return jsonify(r)
 
 @app.route("/api/mock/ride_quote", methods=["POST"])
@@ -11888,20 +11927,24 @@ def api_trip_compare():
 @app.route("/api/task-state", methods=["GET", "DELETE"])
 def api_task_state():
     session_id = request.args.get("session_id", "default")
+    user_id = _request_user_id({})
+    state_session_id = _scoped_session_id(session_id, user_id)
     if request.method == "DELETE":
-        _clear_task_state(session_id)
+        _clear_task_state(state_session_id)
         return jsonify({"success": True})
-    return jsonify(_get_task_state(session_id))
+    return jsonify(_get_task_state(state_session_id))
 
 
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
     """完整清空指定 session 的所有后端状态，配合前端生成新 session_id 使用。"""
     b = request.get_json(force=True) or {}
-    session_id = b.get("session_id", "default")
+    raw_session_id = b.get("session_id", "default")
+    user_id = _request_user_id(b)
+    session_id = _scoped_session_id(raw_session_id, user_id)
     _clear_task_state(session_id)
-    print(f"[RESET] session {session_id!r} cleared")
-    return jsonify({"ok": True, "message": "session reset", "session_id": session_id})
+    print(f"[RESET] user_id={user_id!r} session {raw_session_id!r} cleared")
+    return jsonify({"ok": True, "message": "session reset", "session_id": raw_session_id})
 
 
 @app.route("/api/agent", methods=["POST"])
@@ -11913,7 +11956,9 @@ def api_agent():
     raw_history= b.get("history", [])
     persona    = b.get("persona","").strip()
     personas   = b.get("personas", [])
-    session_id = b.get("session_id", "default")
+    raw_session_id = b.get("session_id", "default")
+    user_id = _request_user_id(b)
+    session_id = _scoped_session_id(raw_session_id, user_id)
     action_type= b.get("action_type","").strip()
     option_id  = b.get("option_id","").strip()
     request_budget = _optional_int(b.get("budget"), 0) or 0
@@ -11958,6 +12003,7 @@ def api_agent():
         final_city_used = detected_city
         city_source = "explicit_destination"
     is_new_destination_task = _is_new_destination_task(msg, _det_city_str)
+    print(f"[AGENT] user_id={user_id!r} raw_session={raw_session_id!r}")
     print(f"[AGENT] raw_message={msg!r}")
     print(f"[AGENT] is_pure_reset={is_pure_reset}")
     print(f"[AGENT] detected_city={_det_city_str!r}")
@@ -12142,7 +12188,8 @@ def api_agent():
 
     base = run_deepseek_agent(msg, city, history, persona, route_profile,
                               route_strategy, map_provider, extra_system=task_ctx,
-                              body_coords=body_coords)
+                              body_coords=body_coords, user_id=user_id,
+                              session_id=raw_session_id)
     print("[AGENT] planning_pipeline_called=True")
     return Response(stream_with_context(_wrap_with_task_state(base.response)),
                     mimetype="text/event-stream")
@@ -12159,7 +12206,9 @@ def api_chat():
     route_profile  = b.get("route_profile","").strip()
     route_strategy = b.get("route_strategy","").strip()
     map_provider   = b.get("map_provider","").strip()
-    session_id = b.get("session_id", "default")
+    raw_session_id = b.get("session_id", "default")
+    user_id = _request_user_id(b)
+    session_id = _scoped_session_id(raw_session_id, user_id)
     action_type= b.get("action_type","").strip()
     option_id  = b.get("option_id","").strip()
     if not msg: return jsonify({"error":"message不能为空"}), 400
@@ -12167,7 +12216,7 @@ def api_chat():
     # ── 日志 ──────────────────────────────────────────────────
     ts_before = _get_task_state(session_id)
     print(f"[CHAT] raw={msg!r} action_type={action_type!r} option_id={option_id!r} "
-          f"status={ts_before.get('status','idle')} session={session_id}")
+          f"status={ts_before.get('status','idle')} user_id={user_id} session={raw_session_id}")
 
     # ══ 第一步：短输入解析器（在 LLM 之前） ══════════════════════
     resolved = resolve_short_reply(msg, ts_before, action_type, option_id)
@@ -12250,8 +12299,8 @@ def api_chat():
                 elif fn=="mock_book_train":       tr=tool_mock_book_train(fa.get("origin",""),fa.get("destination",""),fa.get("date",""),fa.get("seat_class","二等座"),int(fa.get("passengers",1) or 1),fa.get("user_context",{}))
                 elif fn=="mock_start_service_monitor": tr=tool_mock_start_service_monitor(fa.get("resource_type","queue"),fa.get("target_name",""),fa.get("city",city),fa.get("condition",msg),fa.get("callback_action",""),int(fa.get("duration_minutes",30) or 30),fa.get("user_context",{}))
                 elif fn=="mock_get_monitor_status": tr=tool_mock_get_monitor_status(fa.get("monitor_id",""))
-                elif fn=="create_pending_order":  tr=tool_create_pending_order(fa.get("order_type","unknown"),fa.get("item",{}),fa.get("user_context",{}))
-                elif fn=="confirm_mock_order":    tr=tool_confirm_mock_order(fa.get("order_id",""))
+                elif fn=="create_pending_order":  tr=tool_create_pending_order(fa.get("order_type","unknown"),fa.get("item",{}),{**fa.get("user_context",{}), "user_id": user_id, "session_id": raw_session_id})
+                elif fn=="confirm_mock_order":    tr=tool_confirm_mock_order(fa.get("order_id",""), user_id)
                 elif fn=="simulate_price_scenario": tr=tool_simulate_price_scenario(fa.get("event_type","normal"),fa.get("origin",""),fa.get("destination",""),fa.get("city",city))
                 elif fn=="patch_plan_item":        tr=tool_patch_plan_item(fa.get("order_id",""),fa.get("item_type","hotel"),fa.get("reason",""),fa.get("persona",persona),fa.get("budget_max",0))
                 else: tr={"error":"unknown"}
@@ -12324,22 +12373,26 @@ def api_translate_batch():
 @app.route("/api/history", methods=["GET", "POST", "DELETE"])
 def api_history():
     if request.method == "DELETE":
+        payload = request.get_json(silent=True) or {}
+        user_id = _request_user_id(payload)
         with _history_conn() as conn:
-            conn.execute("DELETE FROM chat_messages")
+            conn.execute("DELETE FROM chat_messages WHERE user_id = ?", (user_id,))
             try:
                 conn.execute("INSERT INTO chat_messages_fts(chat_messages_fts) VALUES('rebuild')")
             except Exception:
                 pass
-        return jsonify({"success": True})
+        return jsonify({"success": True, "user_id": user_id})
     if request.method == "GET":
         q = request.args.get("q", "").strip()
         limit = _optional_int(request.args.get("limit"), 30) or 30
-        return jsonify({"success": True, "items": _search_history(q, limit)})
+        user_id = _request_user_id({})
+        return jsonify({"success": True, "items": _search_history(q, limit, user_id), "user_id": user_id})
     b = request.get_json(force=True)
     messages = b.get("messages")
     city = b.get("city", "")
     persona = b.get("persona", "")
     session_id = b.get("session_id", "default")
+    user_id = _request_user_id(b)
     lang = b.get("lang", "zh")
     saved = []
     if isinstance(messages, list):
@@ -12353,6 +12406,7 @@ def api_history():
                     msg.get("plan_json"),
                     msg.get("order_json"),
                     msg.get("meta_json"),
+                    user_id,
                 )
                 if item:
                     saved.append(item)
@@ -12365,6 +12419,7 @@ def api_history():
             b.get("plan_json"),
             b.get("order_json"),
             b.get("meta_json"),
+            user_id,
         )
         if item:
             saved.append(item)
