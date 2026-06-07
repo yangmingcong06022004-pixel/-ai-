@@ -598,8 +598,8 @@
   .mt-map-box{min-height:250px;border:1px solid rgba(255,107,0,.14);border-radius:14px;overflow:hidden;position:relative;background:#edf5ef}
   .mt-live-map{position:absolute;inset:0;z-index:0}
   .mt-map-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:12px;background:linear-gradient(135deg,#fff8dc,#ffe8a3 48%,#fffdf5)}
-  .mt-map-actions{position:absolute;right:10px;bottom:10px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-  .mt-map-actions a{font-size:11px;color:var(--o2);text-decoration:none;border:1px solid rgba(249,115,22,.24);background:rgba(255,255,255,.92);border-radius:999px;padding:5px 9px;font-weight:800}
+  .mt-map-actions{position:absolute;right:10px;bottom:10px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 20px)}
+  .mt-map-actions a,.mt-map-actions button{font-size:11px;color:var(--o2);text-decoration:none;border:1px solid rgba(249,115,22,.24);background:rgba(255,255,255,.92);border-radius:999px;padding:5px 9px;font-weight:800;cursor:pointer;font-family:var(--sans)}
   .mt-card{background:#fff;border:1px solid rgba(255,107,0,.14);border-radius:12px;padding:10px 11px;box-shadow:0 1px 6px rgba(200,100,0,.04)}
   .mt-card-photo{width:100%;height:92px;border-radius:10px;object-fit:cover;margin-bottom:8px;background:var(--bg2);display:block}
   .mt-card-name{font-size:13px;font-weight:900;color:#1c0800;line-height:1.35;margin-bottom:6px}
@@ -870,7 +870,7 @@
     .workspace:before{display:none}
     .panel,.chat-panel{width:100%;height:auto;min-height:0;overflow:visible}
     .chat-home{display:block;height:auto;min-height:0;overflow:visible}
-    .chat-home-main,.chat-conv-area,.result-panel{height:auto;overflow:visible;padding-left:16px;padding-right:16px;padding-bottom:96px}
+    .chat-home-main,.chat-conv-area,.result-panel{height:auto;overflow:visible;padding-left:16px;padding-right:16px;padding-bottom:16px}
     .chat-home-main{max-width:none;margin:0;padding-top:24px;gap:16px}
     .chat-home.task-started .chat-home-main{padding:10px 14px 10px}
     .chat-hero-title{font-size:24px;line-height:1.25;letter-spacing:1px}
@@ -892,7 +892,12 @@
     .feat-card{min-height:132px;padding:12px;box-shadow:none;transition:none}
     .feat-card:hover{transform:none;box-shadow:none}
     .feat-card:before{display:none}
-    .chat-input-bar{position:sticky;bottom:0;z-index:20;padding:10px 12px max(10px,env(safe-area-inset-bottom));background:#fbf7ef;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+    .chat-input-bar{position:static;z-index:20;padding:10px 12px max(10px,env(safe-area-inset-bottom));background:#fbf7ef;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+    body.has-bottom-input .chat-input-bar{position:fixed;left:0;right:0;bottom:0;z-index:999;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid rgba(0,0,0,.08);background:#fbf7ef}
+    body.has-bottom-input .chat-conv-area,body.has-bottom-input .result-panel{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+    .pt-map-actions,.mt-map-actions{gap:8px;overflow-x:auto;overflow-y:visible;flex-wrap:nowrap;padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .pt-map-actions::-webkit-scrollbar,.mt-map-actions::-webkit-scrollbar{display:none}
+    .pt-map-actions a,.pt-map-actions button,.mt-map-actions a,.mt-map-actions button{flex:0 0 auto;white-space:nowrap;font-size:13px;padding:8px 12px}
     .chat-textarea{max-height:88px}
     .chat-conv-area{height:auto;overflow:visible;padding-top:14px;padding-bottom:96px}
     .msg,.msg-body,.msg.wide-agent .msg-body{max-width:100%}
@@ -1223,6 +1228,15 @@ const MOBILE_VIEWPORT = window.matchMedia('(max-width: 768px)');
 function scrollOpts(block='end'){
   const safeBlock = MOBILE_VIEWPORT.matches && block === 'end' ? 'nearest' : block;
   return {behavior:MOBILE_VIEWPORT.matches?'auto':'smooth',block:safeBlock};
+}
+function syncVisualViewportHeight(){
+  if (window.visualViewport) {
+    document.documentElement.style.setProperty('--vvh', `${window.visualViewport.height}px`);
+  }
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', syncVisualViewportHeight, {passive:true});
+  syncVisualViewportHeight();
 }
 const HOME_PLACEHOLDER_ZH = '一句话告诉我：去哪、几天、预算、偏好。例如：周六和3个朋友去厦门玩一天，人均500，想拍照吃本地菜，不想排队';
 const HOME_PLACEHOLDER_ZH_MOBILE = '例如：厦门1天，人均500，想拍照吃本地菜';
@@ -2445,7 +2459,8 @@ async function startNewChat(){
     home.classList.remove('task-started');
   }
   const bar = document.getElementById('chatInputBar');
-  if (bar) bar.style.display = 'flex';
+  if (bar) bar.style.display = 'none';
+  document.body.classList.remove('has-bottom-input');
   const input = document.getElementById('chatInput');
   if (input) {
     input.value = '';
@@ -2678,6 +2693,7 @@ function showChatConv(taskInput=''){
   updateHomeTaskSummary(taskInput || lastHomeTaskInput);
   document.getElementById('chatMessages').style.display='flex';
   document.getElementById('chatInputBar').style.display='flex';
+  document.body.classList.add('has-bottom-input');
   const chatInput = document.getElementById('chatInput');
   if (chatInput) chatInput.placeholder = getChatPlaceholder();
   restoreChatHistoryToMessages();
@@ -4385,7 +4401,7 @@ function renderWeekendPlan(plan, mapId) {
   ];
   const route = plan?.route || {};
   const activeProvider = plan?.map_provider || mapProvider || 'gaode';
-  const providerLabels = {gaode:'地图', baidu:'百度地图', google:'谷歌地图'};
+  const providerLabels = {gaode:'高德地图', baidu:'百度地图', google:'Google Map'};
   const providerIcons = {gaode:'📍', baidu:'🗺️', google:'🌐'};
   const mapBtns = ['gaode','baidu','google'].map(p => {
     const url = plan?.map_urls?.[p] || getWeekendFallbackMapUrl(plan, p);
@@ -4660,21 +4676,20 @@ function renderPanoramaTrip(plan) {
   const origin = plan?.origin || {};
   const dest = plan?.destination || {};
   const weather = plan?.weather || {};
-  const flight = plan?.flight_query || {};
   const activeProvider = plan?.map_provider || mapProvider || 'gaode';
-  const providerLabels = {gaode:'地图', baidu:'百度地图', google:'谷歌地图', flight:'航班查询'};
-  const providerIcons = {gaode:'📍', baidu:'🗺️', google:'🌐', flight:'✈️'};
+  const providerLabels = {baidu:'百度地图', gaode:'高德地图', google:'Google Map'};
+  const providerIcons = {baidu:'🗺️', gaode:'📍', google:'🌐'};
   const statusFlow = Array.isArray(plan?.status_flow) ? plan.status_flow : [
     `正在识别出发地：${origin.name || '当前位置'}`,
     `正在识别目的地：${dest.name || '目的地'}`,
     '正在按距离阈值判定交通方式',
     '全景行程已生成'
   ];
-  const mapBtns = ['gaode','baidu','google','flight'].map(p => {
+  const mapBtns = ['baidu','gaode','google'].map(p => {
     const url = plan?.map_urls?.[p];
     if (!url) return '';
-    const active = p === activeProvider || (p === 'flight' && (decision.scope === 'cross_country' || flight.enabled));
-    return `<a class="pt-map-btn${active?' active':''}" href="${escapeHTML(url)}" target="_blank">${providerIcons[p]} ${providerLabels[p]}</a>`;
+    const active = p === activeProvider;
+    return `<a class="pt-map-btn${active?' active':''}" data-action-type="${p === 'baidu' ? 'open_baidu_map_route' : p === 'google' ? 'open_google_map_route' : 'open_amap_route'}" href="${escapeHTML(url)}" target="_blank">${providerIcons[p]} ${providerLabels[p]}</a>`;
   }).join('');
   const flowHTML = statusFlow.map((s,i) => `<div class="pt-status-item"><span>${i===statusFlow.length-1?'✅':'🟢'}</span><span>${escapeHTML(s)}</span></div>`).join('');
   const renderLegs = (items, emptyText) => {
@@ -4744,10 +4759,11 @@ function updateStepPanoramaTrip(sid, plan, cardId) {
 
 function renderPlanMapActions(plan) {
   const urls = plan?.map_urls || {};
-  const labels = {baidu:'百度', gaode:'地图', google:'Google', flight:'机票'};
+  const labels = {baidu:'百度地图', gaode:'高德地图', google:'Google Map'};
+  const actionTypes = {baidu:'open_baidu_map_route', gaode:'open_amap_route', google:'open_google_map_route'};
   return Object.entries(labels).map(([k,label]) => {
     if (!urls[k]) return '';
-    return `<a href="${escapeHTML(urls[k])}" target="_blank">${label}</a>`;
+    return `<a data-action-type="${actionTypes[k]}" href="${escapeHTML(urls[k])}" target="_blank">${label}</a>`;
   }).join('');
 }
 
@@ -5989,7 +6005,7 @@ function renderMapFirstCard(data, cardId) {
   </div>`;
 }
 
-const EXEC_ACTION_TYPES = ['open_amap_route','open_map_route','search_meituan_hotel','mock_taxi_order','mock_train_order','mock_hotel_order','mock_flight_order','mock_ticket_order','restaurant_confirm','queue_monitor','adjust_plan'];
+const EXEC_ACTION_TYPES = ['open_amap_route','open_map_route','open_baidu_map_route','open_google_map_route','search_meituan_hotel','mock_taxi_order','mock_train_order','mock_hotel_order','mock_flight_order','mock_ticket_order','restaurant_confirm','queue_monitor','adjust_plan'];
 
 function buildMapFirstActionLayout(data = {}, rawActions = [], city = '', firstSpot = '', routePts = []) {
   const findPayload = (type) => {
@@ -6189,7 +6205,7 @@ async function handleAction(action, cardId) {
   if (action.requires_confirm && !confirm(`确认执行：${action.label || ''}？（Mock 演示，不真实下单）`)) return;
   try {
     let data;
-    if (at === 'open_amap_route' || at === 'open_map_route') {
+    if (at === 'open_amap_route' || at === 'open_map_route' || at === 'open_baidu_map_route' || at === 'open_google_map_route') {
       if (p.map_url) {
         window.open(p.map_url, '_blank');
         _appendActionResult(cardId, `<div class="act-maplink-card">✅ 已打开导航<br><a href="${escapeHTML(p.map_url)}" target="_blank">${escapeHTML(p.map_url)}</a></div>`);
