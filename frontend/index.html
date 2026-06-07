@@ -2728,7 +2728,7 @@ async function runForm(){
   setStatus('busy',`⏳ 规划${ROUTE_PROFILE_CONFIG[currentRouteProfile].short}路线...`); setMascot('cycling');
   let data;
   try{data=await fetchRoute(city,startAddr,destAddr,rideType,roadPref,currentRouteProfile);}
-  catch(e){setStatus('err','后端失败');setMascot('error');document.getElementById('resultPanel').innerHTML=`<div class="err-card"><strong>❌ 后端请求失败</strong><br>${e.message}<br><br>请确认已运行：<code>python app.py</code><br>后端密钥：<code>export DEEPSEEK_API_KEY=sk-xxx</code></div>`;document.getElementById('runBtn').disabled=false;return;}
+  catch(e){setStatus('err','数据暂未返回');setMascot('error');document.getElementById('resultPanel').innerHTML=`<div class="err-card"><strong>⚠️ 数据暂未返回，已启用备用方案。</strong><br>路线节点会保留，可稍后重新生成或打开地图。</div>`;document.getElementById('runBtn').disabled=false;return;}
   const r=data.route,calEst=Math.round(r.distance_km*35);
   currentTransportMode='riding';
   const mapUrl=getMapUrl(data.start.name,data.start.lat,data.start.lng,data.destination.name,data.destination.lat,data.destination.lng,'riding');
@@ -3247,7 +3247,7 @@ const TECH_CHAIN_ITEMS = [
   ['map', '地图路线引擎：地图 / 百度备用'],
   ['rag', '米其林 / 黑珍珠知识库：高端餐饮增强'],
   ['memory', 'Soul / Hermes：用户偏好记忆'],
-  ['mock', 'Mock API：打车 / 酒店 / 高铁 / 餐厅取号'],
+  ['mock', 'Mock 执行：打车 / 酒店 / 高铁 / 餐厅取号'],
   ['fallback', '部分外部资源未返回，已启用备用方案']
 ];
 
@@ -4603,7 +4603,7 @@ function updateTripInsights(plan) {
       toolLine('longcat_resource', '美团龙猫', '资源搜索已调用', '暂不可用，已切换备用'),
       toolLine('meituan_skill', '美团 Skill', '本地生活资源匹配', '备用'),
       `${(toolOk('amap_route') || toolOk('amap_travel_planner') || toolOk('amap_poi')) ? '✅' : '⭕'} 地图路线引擎：地图 / 百度备用`,
-      `${toolOk('mock_queue_monitor') || hasOrder || paid ? '✅' : '⭕'} Mock API：打车、酒店、高铁、餐厅取号`
+      `${toolOk('mock_queue_monitor') || hasOrder || paid ? '✅' : '⭕'} Mock 执行：打车、酒店、高铁、餐厅取号`
     ];
     taskList.innerHTML = [
       ...businessLines.map(x => `<div class="insight-task">${escapeHTML(x)}</div>`),
@@ -5333,7 +5333,7 @@ async function _copyText(text, okMsg) {
 function _planCity(data) { return data.city || data.destination || '本地'; }
 function sanitizePlanCopyText(text) {
   return String(text || '')
-    .replace(/route_map_json|city_guard|API error/gi, '路线数据')
+    .replace(/route_map_json|city_guard|API error|API|429|timeout|限流|Key|WebService|raw response|raw_text|高德错误/gi, '数据暂未返回，已启用备用方案')
     .replace(/\bPOI\b/gi, '地点')
     .replace(/高德|AMap/gi, '地图')
     .replace(/\bRAG\b|rag_documents\.csv|CSV|PDF|chunk/gi, '餐厅资料')

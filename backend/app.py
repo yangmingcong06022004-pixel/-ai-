@@ -485,7 +485,7 @@ AMAP_CIRCUIT_PERSISTENT_CODES = {
     "USERKEY_PLAT_NOMATCH", "INVALID_USER_KEY", "USERKEY_INVALID",
     "DAILY_QUERY_OVER_LIMIT", "CUQPS_HAS_EXCEEDED_THE_LIMIT", "missing_key",
 }
-AMAP_CIRCUIT_TTL = int(os.environ.get("AMAP_CIRCUIT_TTL", "60"))  # 熔断保持秒数；期间高德调用直接跳过走兜底，成功一次即复位
+AMAP_CIRCUIT_TTL = int(os.environ.get("AMAP_CIRCUIT_TTL", "300"))  # 熔断保持秒数；期间高德调用直接跳过走兜底，成功一次即复位
 _AMAP_CIRCUIT = {"open_until": 0.0, "reason": ""}
 
 def _amap_circuit_open() -> bool:
@@ -500,16 +500,7 @@ def _reset_amap_circuit() -> None:
     _AMAP_CIRCUIT.update({"open_until": 0.0, "reason": ""})
 
 def _amap_user_message(info: str) -> str:
-    code = str(info or "").strip()
-    if code == "USERKEY_PLAT_NOMATCH":
-        return "高德 WebService Key 类型不匹配：当前 Key 未绑定 Web服务 API，已切换美团/Mock兜底。"
-    if code in ("INVALID_USER_KEY", "USERKEY_INVALID"):
-        return "高德 WebService Key 无效，已切换美团/Mock兜底。"
-    if code in ("DAILY_QUERY_OVER_LIMIT", "CUQPS_HAS_EXCEEDED_THE_LIMIT"):
-        return "高德 WebService 调用额度或频率受限，已切换美团/Mock兜底。"
-    if code == "missing_key":
-        return "高德 WebService Key 未配置，已切换美团/Mock兜底。"
-    return f"高德暂不可用（{code or '未知原因'}），已切换美团/Mock兜底。"
+    return MAP_ROUTE_FRIENDLY_FALLBACK
 
 def _remember_amap_error(info: str) -> str:
     msg = _amap_user_message(info)
@@ -1040,9 +1031,25 @@ WMO_ZH = {0:"晴",1:"晴间多云",2:"多云",3:"阴",45:"雾",48:"浓雾",
     85:"小阵雪",86:"大阵雪",95:"雷暴",96:"雷暴冰雹",99:"强雷暴冰雹"}
 WEATHER_CACHE = {}
 WEATHER_CACHE_LOCK = threading.Lock()
-WEATHER_CACHE_TTL_SECONDS = int(os.environ.get("WEATHER_CACHE_TTL_SECONDS", "900"))
+WEATHER_CACHE_TTL_SECONDS = int(os.environ.get("WEATHER_CACHE_TTL_SECONDS", "1800"))
 WEATHER_CACHE_STALE_SECONDS = int(os.environ.get("WEATHER_CACHE_STALE_SECONDS", "21600"))
-WEATHER_FRIENDLY_FALLBACK = "天气服务暂时繁忙，路线已继续生成；建议出发前二次确认天气。"
+WEATHER_FRIENDLY_FALLBACK = "天气数据暂未返回，当前先按常规出行条件生成路线；出发前建议再次确认天气。"
+
+EXTERNAL_CACHE_TTLS = {
+    "weather": int(os.environ.get("WEATHER_CACHE_TTL_SECONDS", "1800")),
+    "map_route": int(os.environ.get("MAP_ROUTE_CACHE_TTL_SECONDS", "1800")),
+    "map_search": int(os.environ.get("MAP_SEARCH_CACHE_TTL_SECONDS", "1800")),
+    "meituan": int(os.environ.get("MEITUAN_SEARCH_CACHE_TTL_SECONDS", "600")),
+    "rag": int(os.environ.get("RAG_QUERY_CACHE_TTL_SECONDS", "1800")),
+}
+EXTERNAL_CIRCUIT_THRESHOLD = int(os.environ.get("EXTERNAL_CIRCUIT_THRESHOLD", "3"))
+EXTERNAL_CIRCUIT_TTL_SECONDS = int(os.environ.get("EXTERNAL_CIRCUIT_TTL_SECONDS", "300"))
+EXTERNAL_CACHE = {}
+EXTERNAL_CIRCUITS = {}
+EXTERNAL_GUARD_LOCK = threading.Lock()
+FRIENDLY_BACKUP_MESSAGE = "数据暂未返回，已启用备用方案。"
+MAP_ROUTE_FRIENDLY_FALLBACK = "地图路线暂未返回，已保留路线节点，可稍后重新打开地图。"
+MEITUAN_REAL_FRIENDLY_FALLBACK = "美团真实资源暂未返回，当前可使用 Mock 演示数据完成下单流程。"
 
 def _deg_to_dir(deg):
     return ["北","东北","东","东南","南","西南","西","西北"][round(float(deg)/45)%8]+"风"
@@ -1069,6 +1076,59 @@ def _safe_error_text(err) -> str:
     s = re.sub(r"((?:AK|KEY|TOKEN|SECRET|API_KEY)\s*[=:]\s*)[^\s,;]+", r"\1***", s, flags=re.I)
     s = re.sub(r"(Bearer\s+)[A-Za-z0-9._-]+", r"\1***", s, flags=re.I)
     return s
+
+def _friendly_external_error(text: str = "") -> str:
+    s = str(text or FRIENDLY_BACKUP_MESSAGE)
+    if re.search(r"API|429|timeout|timed out|限流|Key|WebService|raw response|raw_text|高德错误|AMap|AMAP|接口|报错", s, re.I):
+        return FRIENDLY_BACKUP_MESSAGE
+    return s or FRIENDLY_BACKUP_MESSAGE
+
+def _external_cache_key(api: str, payload) -> str:
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return f"{api}:{hashlib.sha256(raw.encode('utf-8')).hexdigest()}"
+
+def _external_cache_get(api: str, payload, ttl: int = None) -> Optional[dict]:
+    key = _external_cache_key(api, payload)
+    max_age = ttl if ttl is not None else EXTERNAL_CACHE_TTLS.get(api, 1800)
+    now = time.time()
+    with EXTERNAL_GUARD_LOCK:
+        item = EXTERNAL_CACHE.get(key)
+    if not item or now - item.get("ts", 0) > max_age:
+        return None
+    data = json.loads(json.dumps(item.get("data") or {}, ensure_ascii=False))
+    data["cached"] = True
+    return data
+
+def _external_cache_set(api: str, payload, data: dict) -> None:
+    key = _external_cache_key(api, payload)
+    with EXTERNAL_GUARD_LOCK:
+        EXTERNAL_CACHE[key] = {"ts": time.time(), "data": json.loads(json.dumps(data or {}, ensure_ascii=False))}
+
+def _external_circuit_open(api: str) -> bool:
+    with EXTERNAL_GUARD_LOCK:
+        state = EXTERNAL_CIRCUITS.get(api) or {}
+        return time.time() < float(state.get("open_until") or 0)
+
+def _external_circuit_record(api: str, success: bool, reason: str = "") -> None:
+    with EXTERNAL_GUARD_LOCK:
+        state = EXTERNAL_CIRCUITS.setdefault(api, {"failures": 0, "open_until": 0.0, "reason": ""})
+        if success:
+            state.update({"failures": 0, "open_until": 0.0, "reason": ""})
+            return
+        failures = int(state.get("failures") or 0) + 1
+        state["failures"] = failures
+        state["reason"] = _safe_error_text(reason)[:160]
+        if failures >= EXTERNAL_CIRCUIT_THRESHOLD:
+            state["open_until"] = time.time() + EXTERNAL_CIRCUIT_TTL_SECONDS
+            print(f"[EXTERNAL_CIRCUIT_OPEN] api={api} seconds={EXTERNAL_CIRCUIT_TTL_SECONDS} reason={state['reason']}", flush=True)
+
+def _external_fallback_result(api: str, message: str = FRIENDLY_BACKUP_MESSAGE, cached_payload=None) -> dict:
+    cached = _external_cache_get(api, cached_payload, ttl=EXTERNAL_CACHE_TTLS.get(api, 1800)) if cached_payload is not None else None
+    if cached:
+        cached["stale"] = True
+        cached.setdefault("message", message)
+        return cached
+    return {"success": False, "friendly": True, "message": message, "error": message}
 
 def _weather_cache_key(loc: dict) -> str:
     try:
@@ -1763,36 +1823,64 @@ def _optional_int(value, default=None):
         return default
 
 def geocode_openmeteo(city: str) -> Optional[dict]:
+    payload = {"city": _city_alias(city or "")}
+    cached = _external_cache_get("weather", {"geocode": payload})
+    if cached:
+        return cached.get("loc")
+    if _external_circuit_open("weather"):
+        return None
     try:
         r=requests.get(OM_GEO_URL,params={"name":city,"count":1,"language":"zh","format":"json"},timeout=REQUEST_TIMEOUT)
         r.raise_for_status()
         res=r.json().get("results")
         if res:
             loc=res[0]
-            return {"lat":loc["latitude"],"lng":loc["longitude"],"name":loc.get("name",city),"country":loc.get("country","")}
-    except Exception as e: print(f"[om_geo]{_safe_error_text(e)}")
+            out = {"lat":loc["latitude"],"lng":loc["longitude"],"name":loc.get("name",city),"country":loc.get("country","")}
+            _external_cache_set("weather", {"geocode": payload}, {"success": True, "loc": out})
+            _external_circuit_record("weather", True)
+            return out
+        _external_circuit_record("weather", False, "empty_geocode")
+    except Exception as e:
+        _external_circuit_record("weather", False, _safe_error_text(e))
+        print(f"[om_geo]{_safe_error_text(e)}")
     return None
 
 def geocode_baidu(address: str, city: str = "") -> Optional[dict]:
+    payload = {"address": address or "", "city": city or ""}
+    cached = _external_cache_get("map_search", {"baidu_geocode": payload})
+    if cached:
+        return cached.get("loc")
+    if _external_circuit_open("baidu_map"):
+        return None
     try:
         r=requests.get(BAIDU_GEOCODE_URL,params={"address":address,"city":city,"output":"json","ak":BAIDU_AK},timeout=REQUEST_TIMEOUT)
         d=r.json()
         if d.get("status")==0:
             loc=d["result"]["location"]
-            return {"lat":loc["lat"],"lng":loc["lng"]}
-    except Exception as e: print(f"[baidu_geo]{_safe_error_text(e)}")
+            out = {"lat":loc["lat"],"lng":loc["lng"]}
+            _external_cache_set("map_search", {"baidu_geocode": payload}, {"success": True, "loc": out})
+            _external_circuit_record("baidu_map", True)
+            return out
+        _external_circuit_record("baidu_map", False, d.get("message", "baidu_geocode_failed"))
+    except Exception as e:
+        _external_circuit_record("baidu_map", False, _safe_error_text(e))
+        print(f"[baidu_geo]{_safe_error_text(e)}")
     return None
 
 def geocode_amap(address: str, city: str = "") -> Optional[dict]:
     """高德地理编码：优先服务路线/POI 地图数据，缺 Key 时静默回退。"""
+    payload = {"address": address or "", "city": city or ""}
+    cached = _external_cache_get("map_search", {"amap_geocode": payload})
+    if cached:
+        return cached.get("loc")
     if not AMAP_WEBSERVICE_KEY or not address:
         reason = "missing_key" if not AMAP_WEBSERVICE_KEY else "missing_address"
         _remember_amap_error(reason)
         _log_amap("AMAP_GEOCODE", False, 0, city=city, address=address or "", reason=reason)
-        return None
+        return geocode_baidu(address, city) if address else None
     if _amap_circuit_open():
         _log_amap("AMAP_GEOCODE", False, 0, city=city, address=address or "", reason="circuit_open")
-        return None
+        return geocode_baidu(address, city)
     t0 = time.perf_counter()
     try:
         r = requests.get(AMAP_GEOCODE_URL, params={
@@ -1809,33 +1897,40 @@ def geocode_amap(address: str, city: str = "") -> Optional[dict]:
             if len(loc) == 2:
                 _log_amap("AMAP_GEOCODE", True, elapsed, city=city, address=address)
                 _clear_amap_error()
-                return {
+                out = {
                     "lng": float(loc[0]),
                     "lat": float(loc[1]),
                     "name": geos[0].get("formatted_address") or address,
                     "source": "amap_geocode",
                     **_amap_meta(True, elapsed),
                 }
+                _external_cache_set("map_search", {"amap_geocode": payload}, {"success": True, "loc": out})
+                return out
         reason = d.get("info", "no_geocode")
         _remember_amap_error(reason)
         _log_amap("AMAP_GEOCODE", False, elapsed, city=city, address=address, reason=reason)
     except Exception as e:
         elapsed = round((time.perf_counter() - t0) * 1000)
         _log_amap("AMAP_GEOCODE", False, elapsed, city=city, address=address, reason=_safe_error_text(e))
-    return None
+        _external_circuit_record("map_search", False, _safe_error_text(e))
+    return geocode_baidu(address, city)
 
 def search_amap_place(query: str, city: str = "", limit: int = 5,
                       location: str = "", radius: int = 3000) -> list:
     """高德 POI 搜索：用于高德优先的酒店/美食/景点补充。"""
     print("🟢 [AMAP_POI] city=", city, "keyword=", query)
+    payload = {"query": query or "", "city": city or "", "limit": int(limit or 5), "location": location or "", "radius": int(radius or 3000)}
+    cached = _external_cache_get("map_search", {"amap_place": payload})
+    if cached:
+        return cached.get("items") or []
     if not AMAP_WEBSERVICE_KEY or not query:
         reason = "missing_key" if not AMAP_WEBSERVICE_KEY else "missing_query"
         _remember_amap_error(reason)
         _log_amap("AMAP_POI", False, 0, city=city, query=query or "", reason=reason)
-        return []
+        return _baidu_places_as_map_items(search_baidu_place(query, city, limit), query, city)
     if _amap_circuit_open():
         _log_amap("AMAP_POI", False, 0, city=city, query=query or "", reason="circuit_open")
-        return []
+        return _baidu_places_as_map_items(search_baidu_place(query, city, limit), query, city)
     t0 = time.perf_counter()
     try:
         params = {
@@ -1860,7 +1955,8 @@ def search_amap_place(query: str, city: str = "", limit: int = 5,
             reason = d.get("info", "amap_poi_failed")
             _remember_amap_error(reason)
             _log_amap("AMAP_POI", False, elapsed, city=city, query=query, reason=reason)
-            return []
+            _external_circuit_record("map_search", False, reason)
+            return _baidu_places_as_map_items(search_baidu_place(query, city, limit), query, city)
         out = []
         for p in (d.get("pois") or [])[:limit]:
             loc = str(p.get("location") or "")
@@ -1894,11 +1990,14 @@ def search_amap_place(query: str, city: str = "", limit: int = 5,
         _log_amap("AMAP_POI", bool(out), elapsed, city=city, query=query, count=len(out))
         if out:
             _clear_amap_error()
+            _external_cache_set("map_search", {"amap_place": payload}, {"success": True, "items": out})
+            _external_circuit_record("map_search", True)
         return out
     except Exception as e:
         elapsed = round((time.perf_counter() - t0) * 1000)
         _log_amap("AMAP_POI", False, elapsed, city=city, query=query, reason=_safe_error_text(e))
-    return []
+        _external_circuit_record("map_search", False, _safe_error_text(e))
+    return _baidu_places_as_map_items(search_baidu_place(query, city, limit), query, city)
 
 def search_amap_around_facility(lat: float, lng: float, types: str,
                                 radius: int = 2000, limit: int = 8) -> list:
@@ -2306,15 +2405,87 @@ def _amap_coord_text(value: str, city: str = "") -> str:
         return f"{loc['lng']},{loc['lat']}"
     return ""
 
+def _coord_for_baidu(value: str, city: str = "") -> Optional[dict]:
+    pair = _parse_lat_lng(value)
+    if pair:
+        return pair
+    s = str(value or "").strip()
+    m = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", s)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        if abs(a) > 90 and abs(b) <= 90:
+            return {"lat": b, "lng": a}
+        if abs(a) <= 90 and abs(b) <= 180:
+            return {"lat": a, "lng": b}
+    return geocode_baidu(value, city)
+
+def _baidu_route_backup(origin: str, destination: str, mode: str = "walking", city: str = "") -> dict:
+    mode_key = {"walk": "walking", "drive": "walking", "bus": "walking", "bicycle": "riding", "riding": "riding"}.get(mode, mode or "walking")
+    payload = {"origin": origin or "", "destination": destination or "", "mode": mode_key, "city": city or ""}
+    cached = _external_cache_get("map_route", {"baidu_route": payload})
+    if cached:
+        return cached
+    if _external_circuit_open("baidu_map"):
+        return {"success": False, "error": MAP_ROUTE_FRIENDLY_FALLBACK, "message": MAP_ROUTE_FRIENDLY_FALLBACK, "provider": "baidu"}
+    oc = _coord_for_baidu(origin, city)
+    dc = _coord_for_baidu(destination, city)
+    if not oc or not dc:
+        return {"success": False, "error": MAP_ROUTE_FRIENDLY_FALLBACK, "message": MAP_ROUTE_FRIENDLY_FALLBACK, "provider": "baidu"}
+    url = BAIDU_RIDING_URL if mode_key == "riding" else BAIDU_WALKING_URL
+    t0 = time.perf_counter()
+    try:
+        params = {
+            "origin": f"{oc['lat']},{oc['lng']}",
+            "destination": f"{dc['lat']},{dc['lng']}",
+            "steps_info": 1,
+            "ret_coordtype": "bd09ll",
+            "ak": BAIDU_AK,
+        }
+        if mode_key == "riding":
+            params.update({"riding_type": 0, "road_prefer": 0})
+        r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+        elapsed = round((time.perf_counter() - t0) * 1000)
+        d = r.json()
+        if d.get("status") != 0:
+            _external_circuit_record("baidu_map", False, d.get("message", "baidu_route_failed"))
+            return {"success": False, "error": MAP_ROUTE_FRIENDLY_FALLBACK, "message": MAP_ROUTE_FRIENDLY_FALLBACK, "provider": "baidu"}
+        best = (d.get("result", {}).get("routes") or [{}])[0]
+        raw_steps = best.get("steps", []) or []
+        points = _extract_baidu_path_points(raw_steps) or [oc, dc]
+        out = {
+            "success": True,
+            "provider": "baidu",
+            "map_engine": "地图路线引擎",
+            "mode": mode_key,
+            "origin": f"{oc['lng']},{oc['lat']}",
+            "destination": f"{dc['lng']},{dc['lat']}",
+            "distance_m": int(best.get("distance", 0) or 0),
+            "duration_sec": int(best.get("duration", 0) or 0),
+            "steps": raw_steps[:12],
+            "points": points,
+            "elapsed_ms": elapsed,
+            "message": "地图路线已生成",
+        }
+        _external_cache_set("map_route", {"baidu_route": payload}, out)
+        _external_circuit_record("baidu_map", True)
+        return out
+    except Exception as e:
+        _external_circuit_record("baidu_map", False, _safe_error_text(e))
+        return {"success": False, "error": MAP_ROUTE_FRIENDLY_FALLBACK, "message": MAP_ROUTE_FRIENDLY_FALLBACK, "provider": "baidu"}
+
 def route_amap(origin: str, destination: str, mode: str = "walking", city: str = "") -> dict:
     """高德 Web Service 路径规划，返回轻量结构；缺 Key 时让调用方回退。"""
+    payload = {"origin": origin or "", "destination": destination or "", "mode": mode or "walking", "city": city or ""}
+    cached = _external_cache_get("map_route", {"amap_route": payload})
+    if cached:
+        return cached
     if not AMAP_WEBSERVICE_KEY:
         _remember_amap_error("missing_key")
         _log_amap("AMAP_ROUTE", False, 0, city=city, mode=mode, reason="missing_key")
-        return {"success": False, "error": _amap_user_message("missing_key"), **_amap_meta(False, 0)}
+        return _baidu_route_backup(origin, destination, mode, city)
     if _amap_circuit_open():
         _log_amap("AMAP_ROUTE", False, 0, city=city, mode=mode, reason="circuit_open")
-        return {"success": False, "error": AMAP_LAST_ERROR.get("message") or "高德暂不可用，已切换兜底", **_amap_meta(False, 0)}
+        return _baidu_route_backup(origin, destination, mode, city)
     t0 = time.perf_counter()
     mode_key = {"walk": "walking", "drive": "driving", "bus": "transit", "bicycle": "riding"}.get(mode, mode)
     url = AMAP_ROUTE_URLS.get(mode_key, AMAP_ROUTE_URLS["walking"])
@@ -2323,7 +2494,7 @@ def route_amap(origin: str, destination: str, mode: str = "walking", city: str =
     if not o or not d:
         elapsed = round((time.perf_counter() - t0) * 1000)
         _log_amap("AMAP_ROUTE", False, elapsed, city=city, mode=mode_key, origin=origin, destination=destination, reason="coord_parse_failed")
-        return {"success": False, "error": "起终点坐标解析失败", **_amap_meta(False, elapsed)}
+        return _baidu_route_backup(origin, destination, mode, city)
     try:
         params = {"key": AMAP_WEBSERVICE_KEY, "origin": o, "destination": d, "output": "JSON"}
         if mode_key == "transit":
@@ -2335,7 +2506,8 @@ def route_amap(origin: str, destination: str, mode: str = "walking", city: str =
             reason = data.get("info", "route_failed")
             msg = _remember_amap_error(reason)
             _log_amap("AMAP_ROUTE", False, elapsed, city=city, mode=mode_key, origin=origin, destination=destination, reason=reason)
-            return {"success": False, "error": msg, "raw": data, **_amap_meta(False, elapsed)}
+            _external_circuit_record("map_route", False, reason)
+            return _baidu_route_backup(origin, destination, mode, city)
         route = data.get("route") or {}
         paths = route.get("paths") or route.get("transits") or []
         best = paths[0] if paths else {}
@@ -2343,7 +2515,7 @@ def route_amap(origin: str, destination: str, mode: str = "walking", city: str =
         print("🟢 [AMAP_ROUTE] route_points=", route_points)
         _log_amap("AMAP_ROUTE", True, elapsed, city=city, mode=mode_key, origin=origin, destination=destination)
         _clear_amap_error()
-        return {
+        out = {
             "success": True,
             "provider": "gaode",
             **_amap_meta(True, elapsed),
@@ -2356,13 +2528,23 @@ def route_amap(origin: str, destination: str, mode: str = "walking", city: str =
             "points": route_points,
             "raw": data,
         }
+        _external_cache_set("map_route", {"amap_route": payload}, out)
+        _external_circuit_record("map_route", True)
+        return out
     except Exception as e:
         elapsed = round((time.perf_counter() - t0) * 1000)
         _log_amap("AMAP_ROUTE", False, elapsed, city=city, mode=mode_key, origin=origin, destination=destination, reason=_safe_error_text(e))
-        return {"success": False, "error": _safe_error_text(e), **_amap_meta(False, elapsed)}
+        _external_circuit_record("map_route", False, _safe_error_text(e))
+        return _baidu_route_backup(origin, destination, mode, city)
 
 def search_baidu_place(query: str, city: str = "", limit: int = 3) -> list:
     """百度地点检索：用于周末 Agent 的真实基础 POI 坐标校准。"""
+    payload = {"query": query or "", "city": city or "", "limit": int(limit or 3)}
+    cached = _external_cache_get("map_search", {"baidu_place": payload})
+    if cached:
+        return cached.get("items") or []
+    if _external_circuit_open("baidu_map"):
+        return []
     try:
         r = requests.get(BAIDU_PLACE_URL, params={
             "query": query, "region": city or "全国", "output": "json",
@@ -2370,10 +2552,50 @@ def search_baidu_place(query: str, city: str = "", limit: int = 3) -> list:
         }, timeout=REQUEST_TIMEOUT)
         d = r.json()
         if d.get("status") == 0:
-            return d.get("results", [])[:limit]
+            items = d.get("results", [])[:limit]
+            _external_cache_set("map_search", {"baidu_place": payload}, {"success": True, "items": items})
+            _external_circuit_record("baidu_map", True)
+            return items
+        _external_circuit_record("baidu_map", False, d.get("message", "baidu_place_failed"))
     except Exception as e:
+        _external_circuit_record("baidu_map", False, _safe_error_text(e))
         print(f"[baidu_place]{_safe_error_text(e)}")
     return []
+
+def _baidu_places_as_map_items(rows: list, query: str = "", city: str = "") -> list:
+    out = []
+    for p in (rows or []):
+        loc = p.get("location") or {}
+        lat = _coerce_float(loc.get("lat") if isinstance(loc, dict) else None)
+        lng = _coerce_float(loc.get("lng") if isinstance(loc, dict) else None)
+        item = {
+            "name": p.get("name", ""),
+            "address": p.get("address", ""),
+            "rating": "",
+            "cost": "",
+            "distance": p.get("distance", ""),
+            "type": p.get("detail_info", {}).get("tag", "") if isinstance(p.get("detail_info"), dict) else "",
+            "tel": p.get("telephone", ""),
+            "location": f"{lng},{lat}" if lat is not None and lng is not None else "",
+            "lng": lng,
+            "lat": lat,
+            "photo_url": "",
+            "source": "地图参考",
+            "query_city": city or "",
+            "data_source": "baidu",
+            "tool_name": "baidu-map-backup",
+            "success": True,
+            "elapsed_ms": 0,
+            "data_level": "B_REAL_MAP_POI",
+            "is_real_poi": True,
+            "can_order": False,
+            "advantage": "地图参考，需二次确认营业状态后再加入行程。",
+        }
+        if item["name"]:
+            out.append(item)
+    if out:
+        _external_cache_set("map_search", {"baidu_as_map": {"query": query or "", "city": city or "", "limit": len(out)}}, {"success": True, "items": out})
+    return out
 
 def _parse_lat_lng(text: str) -> Optional[dict]:
     s = str(text or "")
@@ -5570,7 +5792,7 @@ def _meituan_append_payload(success: bool, city: str, category: str, items: list
         "keyword": keyword or "",
         "items": [],
         "results": [],
-        "message": message or "美团真实资源暂未返回，当前可使用 Mock 演示",
+        "message": message or MEITUAN_REAL_FRIENDLY_FALLBACK,
         "mock_notice": "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。",
     }
 
@@ -6761,18 +6983,21 @@ def tool_plan_meituan_trip(city: str, user_prompt: str,
             try:
                 results["weather"] = futures["weather"].result(timeout=REQUEST_TIMEOUT + 1)
             except Exception as e:
-                results["weather"] = {"success": False, "error": _safe_error_text(e)}
+                _external_circuit_record("weather", False, _safe_error_text(e))
+                results["weather"] = {"success": False, "error": WEATHER_FRIENDLY_FALLBACK, "message": WEATHER_FRIENDLY_FALLBACK}
             if can_use_meituan_resources:
                 for key in ("foods", "sights"):
                     try:
                         results[key] = futures[key].result(timeout=MEITUAN_SKILL_TIMEOUT)
                     except Exception as e:
-                        results[key] = {"success": False, "error": _safe_error_text(e)}
+                        _external_circuit_record("meituan", False, _safe_error_text(e))
+                        results[key] = {"success": False, "error": MEITUAN_REAL_FRIENDLY_FALLBACK, "message": MEITUAN_REAL_FRIENDLY_FALLBACK, "mock_notice": "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。"}
             if "longcat_resources" in futures:
                 try:
                     results["longcat_resources"] = futures["longcat_resources"].result(timeout=LONGCAT_RESOURCE_TIMEOUT + 1)
                 except Exception as e:
-                    results["longcat_resources"] = {"success": False, "message": "美团龙猫暂不可用，已切换备用数据源", "error": _safe_error_text(e)}
+                    _external_circuit_record("meituan", False, _safe_error_text(e))
+                    results["longcat_resources"] = {"success": False, "message": MEITUAN_REAL_FRIENDLY_FALLBACK, "error": MEITUAN_REAL_FRIENDLY_FALLBACK, "mock_notice": "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。"}
             else:
                 results["longcat_resources"] = (
                     {"success": False, "message": "用户要求避开美团，未调用美团龙猫", "status": "blocked"}
@@ -6783,6 +7008,7 @@ def tool_plan_meituan_trip(city: str, user_prompt: str,
                 try:
                     results[key] = futures[key].result(timeout=REQUEST_TIMEOUT + 1)
                 except Exception as e:
+                    _external_circuit_record("map_search", False, _safe_error_text(e))
                     results[key] = []
         hotels = []
         foods = _attach_item_coords(_real_meituan_items(results.get("foods", {}), 6), city_name, allow_geocode=False) if can_use_meituan_resources else []
@@ -6808,7 +7034,13 @@ def tool_plan_meituan_trip(city: str, user_prompt: str,
                         wait_time = LONGCAT_RESOURCE_TIMEOUT + 1
                     results[key] = fut.result(timeout=wait_time)
                 except Exception as e:
-                    results[key] = [] if key.startswith("amap_") else {"success": False, "message": "美团龙猫暂不可用，已切换备用数据源" if key == "longcat_resources" else "", "error": _safe_error_text(e)}
+                    if key.startswith("amap_"):
+                        _external_circuit_record("map_search", False, _safe_error_text(e))
+                        results[key] = []
+                    else:
+                        _external_circuit_record("meituan" if key == "longcat_resources" else "weather", False, _safe_error_text(e))
+                        msg = MEITUAN_REAL_FRIENDLY_FALLBACK if key == "longcat_resources" else WEATHER_FRIENDLY_FALLBACK
+                        results[key] = {"success": False, "message": msg, "error": msg}
         hotels = _attach_item_coords(_real_meituan_items(results.get("hotels", {}), 3), city_name, allow_geocode=False)
         foods = _attach_item_coords(_real_meituan_items(results.get("foods", {}), 6), city_name, allow_geocode=False)
         sights = _attach_item_coords(_real_meituan_items(results.get("sights", {}), 6), city_name, allow_geocode=False)
@@ -7633,6 +7865,8 @@ def _weather_from_loc(loc: dict) -> dict:
     cached = _weather_cached(cache_key, WEATHER_CACHE_TTL_SECONDS)
     if cached:
         return cached
+    if _external_circuit_open("weather"):
+        return _weather_fallback_result(loc, "weather_circuit_open")
     try:
         r=_HTTP_SESSION.get(OM_WEATHER_URL,params={
             "latitude":loc["lat"],"longitude":loc["lng"],
@@ -7652,8 +7886,10 @@ def _weather_from_loc(loc: dict) -> dict:
             "wind_dir":_deg_to_dir(curr.get("wind_direction_10m",0)),
             "wind_class":_kmh_to_level(curr.get("wind_speed_10m",0)),"rh":rh}}
         _weather_store(cache_key, result)
+        _external_circuit_record("weather", True)
         return result
     except Exception as e:
+        _external_circuit_record("weather", False, _safe_error_text(e))
         return _weather_fallback_result(loc, e)
 
 
@@ -7674,7 +7910,7 @@ def tool_get_weather(city: str) -> dict:
     if not loc:
         c=geocode_baidu(ck)
         if c: loc={"lat":c["lat"],"lng":c["lng"],"name":ck,"country":"中国"}
-    if not loc: return {"success":False,"error":f"找不到城市：{ck}"}
+    if not loc: return {"success":False,"friendly":True,"error":WEATHER_FRIENDLY_FALLBACK,"message":WEATHER_FRIENDLY_FALLBACK}
     return _weather_from_loc(loc)
 
 
@@ -7725,6 +7961,16 @@ def tool_plan_route(city: str, start: str, destination: str,
     rp = _resolve_route_profile(route_profile, persona)
     profile_cfg = ROUTE_PROFILES[rp]
     road_prefer = profile_cfg["road_prefer"] if road_prefer is None else int(road_prefer)
+    cache_payload = {
+        "tool_plan_route": {
+            "city": city, "start": start, "destination": destination,
+            "riding_type": riding_type, "road_prefer": road_prefer,
+            "route_profile": rp, "persona": persona, "route_strategy": route_strategy,
+        }
+    }
+    cached = _external_cache_get("map_route", cache_payload)
+    if cached is not None:
+        return cached
     sn=start or f"{city}人民广场"
     start_coord = _parse_lat_lng(sn)
     oc=start_coord or geocode_baidu(sn,city)
@@ -7733,9 +7979,16 @@ def tool_plan_route(city: str, start: str, destination: str,
     if not oc or not dc:
         amap = route_amap(sn, destination, "riding", city)
         if amap.get("success"):
-            return _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
-        if not oc: return {"success":False,"error":f"起点解析失败：{sn}"}
-        if not dc: return {"success":False,"error":f"终点解析失败：{destination}"}
+            out = _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
+            _external_cache_set("map_route", cache_payload, out)
+            return out
+        return {"success":False,"error":MAP_ROUTE_FRIENDLY_FALLBACK,"message":MAP_ROUTE_FRIENDLY_FALLBACK}
+    if _external_circuit_open("baidu_map"):
+        amap = route_amap(sn, destination, "riding", city)
+        if amap.get("success"):
+            out = _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
+            _external_cache_set("map_route", cache_payload, out)
+            return out
     try:
         r=requests.get(BAIDU_RIDING_URL,params={
             "origin":f"{oc['lat']},{oc['lng']}","destination":f"{dc['lat']},{dc['lng']}",
@@ -7743,15 +7996,22 @@ def tool_plan_route(city: str, start: str, destination: str,
             "steps_info":1,"ret_coordtype":"bd09ll","ak":BAIDU_AK},timeout=REQUEST_TIMEOUT)
         d=r.json()
     except Exception as e:
+        _external_circuit_record("baidu_map", False, _safe_error_text(e))
         amap = route_amap(sn, destination, "riding", city)
         if amap.get("success"):
-            return _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
-        return {"success":False,"error":_safe_error_text(e)}
+            out = _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
+            _external_cache_set("map_route", cache_payload, out)
+            return out
+        return {"success":False,"error":MAP_ROUTE_FRIENDLY_FALLBACK,"message":MAP_ROUTE_FRIENDLY_FALLBACK}
     if d.get("status")!=0:
+        _external_circuit_record("baidu_map", False, d.get("message", "route_failed"))
         amap = route_amap(sn, destination, "riding", city)
         if amap.get("success"):
-            return _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
-        return {"success":False,"error":d.get("message","路线规划失败")}
+            out = _format_amap_plan_route(amap, city, start_name, destination, persona, route_profile)
+            _external_cache_set("map_route", cache_payload, out)
+            return out
+        return {"success":False,"error":MAP_ROUTE_FRIENDLY_FALLBACK,"message":MAP_ROUTE_FRIENDLY_FALLBACK}
+    _external_circuit_record("baidu_map", True)
     res=d["result"]; best=res["routes"][0]
     raw_steps = best.get("steps", [])
     steps=[{"name":s.get("name","无名路"),"instruction":s.get("instruction",""),
@@ -7766,7 +8026,7 @@ def tool_plan_route(city: str, start: str, destination: str,
     route_profile_meta["duration_min"] = duration_min
     start_obj = {"name":start_name,"lat":res.get("origin",{}).get("lat"),"lng":res.get("origin",{}).get("lng")}
     dest_obj = {"name":destination,"lat":res.get("destination",{}).get("lat"),"lng":res.get("destination",{}).get("lng")}
-    return {"success":True,
+    out = {"success":True,
         "mode": "riding",
         "route_source": "baidu",
         "map_engine": "百度",
@@ -7787,6 +8047,8 @@ def tool_plan_route(city: str, start: str, destination: str,
         "route":{"distance_m":best["distance"],"distance_km":round(best["distance"]/1000,2),
                  "duration_sec":best["duration"],"duration_min":duration_min,"steps":steps,
                  "points": route_points}}
+    _external_cache_set("map_route", cache_payload, out)
+    return out
 
 
 _CITY_MAP = {
@@ -8618,6 +8880,25 @@ def tool_search_premium_dining(query: str, city: str = "") -> dict:
     """Query local Michelin / Black Pearl RAG data. Never returns mock data."""
     query = str(query or "").strip()
     city = str(city or "").strip()
+    cache_payload = {"query": query, "city": city}
+    cached = _external_cache_get("rag", cache_payload)
+    if cached is not None:
+        return cached
+    if _external_circuit_open("rag"):
+        return {
+            "success": False,
+            "reply_type": "restaurant_recommendations",
+            "title": "餐厅推荐",
+            "city": city,
+            "summary": "餐厅资料暂未返回，稍后可以换城市或关键词再查。",
+            "restaurants": [],
+            "actions": [
+                {"label": "重新检索", "action_type": "retry_restaurant_search", "payload": {"query": query}, "requires_confirm": False},
+                {"label": "换成美团搜索", "action_type": "call_meituan_skill", "payload": {"intent": "restaurant_search", "city": city, "keyword": "餐厅"}, "requires_confirm": False},
+            ],
+            "message": FRIENDLY_BACKUP_MESSAGE,
+            "uses_mock": False,
+        }
     query_city, explicit_city = _premium_query_city_scope(query, city)
     city = query_city or _premium_non_default_city(city, query)
     full_query = query
@@ -8668,6 +8949,8 @@ def tool_search_premium_dining(query: str, city: str = "") -> dict:
         },
         "sections": public_sections,
     })
+    _external_cache_set("rag", cache_payload, response)
+    _external_circuit_record("rag", bool(response.get("success")), response.get("message") or response.get("summary"))
     return response
 
 
@@ -8769,6 +9052,31 @@ def tool_call_meituan_skill(intent: str, city: str = "",
     tags = filters.get("tags", [])
     if isinstance(tags, list) and tags:
         search_kw = " ".join(tags[:2]) + " " + search_kw
+    cache_payload = {
+        "intent": intent,
+        "city": city,
+        "keyword": search_kw,
+        "location": location or "",
+        "lat": round(float(user_lat), 5) if user_lat else "",
+        "lng": round(float(user_lng), 5) if user_lng else "",
+        "filters": filters,
+        "limit": int(limit or 5),
+    }
+    cached = _external_cache_get("meituan", cache_payload)
+    if cached:
+        return cached
+    if _external_circuit_open("meituan"):
+        return {
+            "success": False,
+            "intent": intent,
+            "city": city,
+            "keyword": search_kw,
+            "source": "meituan_skill",
+            "is_real_meituan": False,
+            "error": MEITUAN_REAL_FRIENDLY_FALLBACK,
+            "message": MEITUAN_REAL_FRIENDLY_FALLBACK,
+            "mock_notice": "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。",
+        }
     skill_route = _pick_meituan_skill(intent, search_kw)
     t0 = time.perf_counter()
 
@@ -8778,6 +9086,14 @@ def tool_call_meituan_skill(intent: str, city: str = "",
         result.setdefault("elapsed_ms", elapsed)
         status = "success" if result.get("success") else ("timeout" if "超时" in str(result.get("error", "")) else "error")
         _record_tool_call("meituan_skill", status, elapsed, city=city, intent=intent, source=result.get("source", ""))
+        if result.get("success"):
+            _external_cache_set("meituan", cache_payload, result)
+            _external_circuit_record("meituan", True)
+        else:
+            result["error"] = MEITUAN_REAL_FRIENDLY_FALLBACK
+            result["message"] = MEITUAN_REAL_FRIENDLY_FALLBACK
+            result["mock_notice"] = "Mock 演示数据，非真实商户，仅用于黑客松端到端演示。"
+            _external_circuit_record("meituan", False, result.get("detail") or status)
         return result
 
     if skill_route == "coupon":
@@ -8860,7 +9176,8 @@ def tool_call_meituan_skill(intent: str, city: str = "",
 
 
 def _tool_summary(fn: str, args: dict, result: dict) -> str:
-    if not result.get("success"): return f"❌ {result.get('message') or result.get('error','失败')}"
+    if not result.get("success"):
+        return f"⚠️ {_friendly_external_error(result.get('message') or result.get('error') or FRIENDLY_BACKUP_MESSAGE)}"
     if fn=="get_weather":
         d=result.get("data",{})
         return f"{result.get('city','')} · {d.get('text','')} · {d.get('temp','')}℃ · {d.get('wind_dir','')}{d.get('wind_class','')} · 湿度{d.get('rh','')}%"
@@ -8874,7 +9191,7 @@ def _tool_summary(fn: str, args: dict, result: dict) -> str:
         return f"{result.get('city','')}周末方案：{result.get('title','')} · {r.get('distance_km','')}km · {r.get('duration_min','')}min · {len(result.get('stops',[]))}个点"
     if fn in ("plan_meituan_trip", "independent_trip_planner"):
         if not result.get("success", True):
-            return f"❌ {result.get('error','失败')}"
+            return f"⚠️ {_friendly_external_error(result.get('message') or result.get('error') or FRIENDLY_BACKUP_MESSAGE)}"
         req=result.get("requirements",{})
         budget=result.get("budget",{})
         if result.get("commerce_mode") == "none":
@@ -8891,7 +9208,8 @@ def _tool_summary(fn: str, args: dict, result: dict) -> str:
         ans=_clean_markdown(result.get("answer",""))
         return ans[:100]+"…" if len(ans)>100 else ans
     if fn=="call_meituan_skill":
-        if not result.get("success"): return f"❌ {result.get('error', result.get('message','失败'))}"
+        if not result.get("success"):
+            return f"⚠️ {_friendly_external_error(result.get('message') or result.get('error') or MEITUAN_REAL_FRIENDLY_FALLBACK)}"
         if result.get("fallback") or result.get("source") == "mock_fallback":
             return f"美团 Skill 暂不可用，未展示店名：{result.get('city','')}{result.get('keyword','')}"
         count = result.get("count", 0)
@@ -11141,7 +11459,7 @@ def _weather_final_text(result: dict) -> str:
 def _rule_weather_agent_response(user_message: str, city_hint: str) -> Response:
     def generate():
         coords = _parse_lat_lng(user_message)
-        if coords and re.search(r"当前位置|当前定位|我这里|我在|附近|本地|nearby|near me", str(user_message or ""), re.I):
+        if coords:
             args = {"lat": coords["lat"], "lng": coords["lng"], "city": "当前位置"}
             yield f"data: {json.dumps({'type':'step_start','id':1,'tool':'get_weather','input':args}, ensure_ascii=False)}\n\n"
             result = tool_get_weather_by_coords(coords["lat"], coords["lng"], "当前位置")
