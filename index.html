@@ -1064,7 +1064,13 @@
 /* ══════════════════════════════
    全局配置
 ══════════════════════════════ */
-const BACKEND = 'http://127.0.0.1:5000';
+const BACKEND = (() => {
+  const override = new URLSearchParams(location.search).get('backend');
+  if (override) return override.replace(/\/$/, '');
+  const localHost = ['localhost', '127.0.0.1', '0.0.0.0', ''].includes(location.hostname);
+  if (localHost || location.protocol === 'file:') return 'http://127.0.0.1:5000';
+  return location.origin;
+})();
 const BAIDU_BROWSER_AK = 'Q0NvMJBcaAzRw6SShYsfl6VNtkeWXKcY';
 const CHAT_HISTORY_KEY = 'madochenggong_chat_history_v1';
 const CHAT_SESSION_KEY = 'madochenggong_session_id_v1';
